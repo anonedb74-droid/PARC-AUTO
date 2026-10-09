@@ -396,10 +396,7 @@ function tabConsum(){
         <div class="stat ${s1<0?'red':''}"><div class="v">${fmtNr(s1)}</div><div class="l">Stoc la sfârșitul lunii (l)</div></div>
       </div>
       ${acum<0?'<div class="alert alert-danger">⚠ Consumul calculat depășește ce s-a alimentat. Verifică alimentările, normele sau stocul inițial.</div>':''}
-      <div class="sec-head" style="margin-top:0;">Alimentări</div>${b.al.length?`<div class="table-wrap"><table><thead><tr><th>Data</th><th class="num">Litri</th><th class="num">Lei</th><th>Document</th><th></th></tr></thead><tbody>
-        ${b.al.sort((x,y)=>x.data.localeCompare(y.data)).map(a=>`<tr><td>${fmtData(a.data)}</td><td class="num">${fmtNr(nr(a.litri))}</td><td class="num">${a.valoare?fmtLei(nr(a.valoare)):'—'}</td><td class="small">${esc(a.document)}</td><td style="text-align:right;"><button class="icon-btn del" data-act="al-del" data-x="${a.id}">${ICONS.trash}</button></td></tr>`).join('')}
-        </tbody></table></div>`:'<p class="small muted">Nicio alimentare în luna aleasă.</p>'}
-      <div class="sec-head">Ore de conducere și curse</div>${b.cu.length?`<div class="table-wrap"><table><thead><tr><th>Data</th><th>Fel</th><th>Cine a condus</th><th class="num">Km plecare</th><th class="num">Km sosire</th><th class="num">Km</th><th class="num">Litri</th><th>Traseu / foaie</th><th></th></tr></thead><tbody>
+      <div class="sec-head" style="margin-top:0;">Ore de conducere și curse</div>${b.cu.length?`<div class="table-wrap"><table><thead><tr><th>Data</th><th>Fel</th><th>Cine a condus</th><th class="num">Km plecare</th><th class="num">Km sosire</th><th class="num">Km</th><th class="num">Litri</th><th>Traseu / foaie</th><th></th></tr></thead><tbody>
         ${b.cu.sort((x,y)=>(x.data+(x.ora||'')).localeCompare(y.data+(y.ora||''))).map(c=>`<tr><td style="white-space:nowrap;">${fmtData(c.data)}${c.ora?`<div class="small muted">${esc(c.ora)}</div>`:''}</td>
           <td><span class="pill ${eOra(c)?(c.regim==='IP'?'pill-blue':'pill-dark'):'pill-yellow'}">${felText(c)}</span></td><td class="small">${esc(c.sofer)}</td>
           <td class="num">${c.kmStart!==''&&c.kmStart!=null?fmtNr(nr(c.kmStart)):'—'}</td><td class="num">${c.kmStop!==''&&c.kmStop!=null?fmtNr(nr(c.kmStop)):'—'}</td>
@@ -407,6 +404,14 @@ function tabConsum(){
           <td class="small">${esc(c.scop)}${c.foaie?`<div class="muted">foaia ${esc(c.foaie)}</div>`:''}</td>
           <td style="text-align:right;"><button class="icon-btn del" data-act="cu-del" data-x="${c.id}">${ICONS.trash}</button></td></tr>`).join('')}
         </tbody></table></div>`:'<p class="small muted">Nimic în luna aleasă.</p>'}
+      <div class="sec-head">Alimentări în ${LUNI[+luna.slice(5)].toLowerCase()}</div><div class="table-wrap"><table><thead><tr><th>Data</th><th class="num">Litri</th><th class="num">Lei</th><th>Document</th><th></th></tr></thead><tbody>
+        <tr style="background:#F8F9FA;"><td><i>Rămas din luna trecută</i></td><td class="num">${fmtNr(s0)}</td><td></td><td class="small muted">stoc în rezervor la 1 ${LUNI_SC[+luna.slice(5)].toLowerCase()}</td><td></td></tr>
+        ${b.al.sort((x,y)=>x.data.localeCompare(y.data)).map(a=>`<tr><td>${fmtData(a.data)}</td><td class="num">${fmtNr(nr(a.litri))}</td><td class="num">${a.valoare?fmtLei(nr(a.valoare)):'—'}</td><td class="small">${esc(a.document)}</td><td style="text-align:right;"><button class="icon-btn del" data-act="al-del" data-x="${a.id}">${ICONS.trash}</button></td></tr>`).join('')}
+        ${b.al.length?'':'<tr><td colspan="5" class="small muted">Nicio alimentare în luna aleasă.</td></tr>'}
+        <tr class="total"><td>Total disponibil</td><td class="num">${fmtNr(s0+b.litri)}</td><td class="num">${b.valoare?fmtLei(b.valoare):''}</td><td class="small">rămas ${fmtNr(s0)} + alimentat ${fmtNr(b.litri)} l</td><td></td></tr>
+        <tr><td>− Consum normat</td><td class="num">${fmtNr(b.consum)}</td><td></td><td></td><td></td></tr>
+        <tr class="total"><td>Rămâne pentru luna următoare</td><td class="num" style="${s1<0?'color:var(--danger);':''}">${fmtNr(s1)}</td><td></td><td></td><td></td></tr>
+        </tbody></table></div>
       </div>`; };
   const sumar=lista.map(v=>{ const b=bilant(v,de,pana); return `<span class="pill pill-dark">${esc(v.nr)}: +${fmtNr(b.litri)} l · −${fmtNr(b.consum)} l · stoc ${fmtNr(stocLa(v,de)+b.litri-b.consum)} l</span>`; }).join(' ');
   const persoane=[...new Set([...state.vehicule.map(v=>v.responsabil), ...state.curse.map(c=>c.sofer)].filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ro'));
@@ -648,22 +653,30 @@ function orientareRaport(){ const v=ui.raport||'situatie'; return (v==='situatie
 function raportConsum(luna){
   const de=luna+'-01', pana=ultimaZi(luna);
   const l=vehOrdonate().filter(v=>areNorma(v) || state.alimentari.some(a=>a.vehId===v.id && inPer(a.data,de,pana)) || state.curse.some(c=>c.vehId===v.id && inPer(c.data,de,pana)));
-  const T={litri:0, valoare:0, oreSS:0, oreIP:0, consumOre:0, parcursCurse:0, consumCurse:0, consum:0};
-  const rows=l.map((v,i)=>{ const b=bilant(v,de,pana), s0=stocLa(v,de), s1=s0+b.litri-b.consum; Object.keys(T).forEach(k=>T[k]+=b[k]);
+  const T={litri:0, valoare:0, oreSS:0, oreIP:0, consumOre:0, parcursCurse:0, consumCurse:0, consum:0}; let T0=0, T1=0;
+  const rows=l.map((v,i)=>{ const b=bilant(v,de,pana), s0=stocLa(v,de), s1=s0+b.litri-b.consum; Object.keys(T).forEach(k=>T[k]+=b[k]); T0+=s0; T1+=s1;
     return `<tr><td class="c">${i+1}</td><td style="white-space:nowrap;"><b>${esc(v.nr)}</b><div style="font-size:9px;">${esc(v.marca)}</div></td><td>${esc(v.combustibil)}</td><td style="font-size:9.5px;">${textNorme(v)||'—'}</td>
-      <td class="r">${fmtNr(s0)}</td><td class="r">${fmtNr(b.litri)}</td><td class="r">${b.valoare?fmtLei(b.valoare):'—'}</td>
+      <td class="r">${fmtNr(s0)}</td><td class="r">${fmtNr(b.litri)}</td><td class="r">${b.valoare?fmtLei(b.valoare):'—'}</td><td class="r"><b>${fmtNr(s0+b.litri)}</b></td>
       <td class="r">${b.oreSS?fmtNr(b.oreSS):''}</td><td class="r">${b.oreIP?fmtNr(b.oreIP):''}</td><td class="r">${b.consumOre?fmtNr(b.consumOre):''}</td>
       <td class="r">${b.nCurse?fmtNr(b.parcursCurse)+(uMas(v)==='ore'?' h':''):''}</td><td class="r">${b.consumCurse?fmtNr(b.consumCurse):''}</td>
       <td class="r"><b>${fmtNr(b.consum)}</b></td><td class="r ${s1<0?'rd':''}">${fmtNr(s1)}</td></tr>`; }).join('');
   const pers={}; state.curse.filter(c=>inPer(c.data,de,pana)).forEach(c=>{ const k=c.sofer||'(nespecificat)'; const x=pers[k]||(pers[k]={ss:0, ip:0, km:0, cu:0, l:0, veh:new Set()}); if(eOra(c)){ if(c.regim==='IP') x.ip+=nr(c.nrOre); else x.ss+=nr(c.nrOre); } else { x.cu++; x.km+=parcursCursa(c); } x.l+=consumCursa(c); const v=vehById(c.vehId); if(v) x.veh.add(v.nr); });
   const f=x=>x?fmtNr(x):'';
   return `<div class="raport" style="max-width:1120px;">${capRaport('Situația consumului de carburant', numeLuna(luna)+' ('+fmtData(de)+' – '+fmtData(pana)+')')}
-    ${l.length?`<table><thead><tr><th rowspan="2">Nr.</th><th rowspan="2">Autovehicul</th><th rowspan="2">Comb.</th><th rowspan="2">Norme de consum</th><th rowspan="2">Stoc inițial (l)</th><th rowspan="2">Alimentat (l)</th><th rowspan="2">Valoare (lei)</th><th colspan="3">Ore de conducere</th><th colspan="2">Curse</th><th rowspan="2">Consum total (l)</th><th rowspan="2">Stoc final (l)</th></tr>
+    ${l.length?`<table><thead><tr><th rowspan="2">Nr.</th><th rowspan="2">Autovehicul</th><th rowspan="2">Comb.</th><th rowspan="2">Norme de consum</th><th rowspan="2">Rămas luna trecută (l)</th><th rowspan="2">Alimentat (l)</th><th rowspan="2">Valoare (lei)</th><th rowspan="2">Total disponibil (l)</th><th colspan="3">Ore de conducere</th><th colspan="2">Curse</th><th rowspan="2">Consum total (l)</th><th rowspan="2">Stoc final (l)</th></tr>
       <tr><th>SS (h)</th><th>IP (h)</th><th>Consum (l)</th><th>Km</th><th>Consum (l)</th></tr></thead><tbody>${rows}
-    <tr><td colspan="5"><b>TOTAL</b></td><td class="r"><b>${fmtNr(T.litri)}</b></td><td class="r"><b>${fmtLei(T.valoare)}</b></td><td class="r"><b>${f(T.oreSS)}</b></td><td class="r"><b>${f(T.oreIP)}</b></td><td class="r"><b>${f(T.consumOre)}</b></td><td class="r"><b>${f(T.parcursCurse)}</b></td><td class="r"><b>${f(T.consumCurse)}</b></td><td class="r"><b>${fmtNr(T.consum)}</b></td><td></td></tr></tbody></table>
+    <tr><td colspan="4"><b>TOTAL</b></td><td class="r"><b>${fmtNr(T0)}</b></td><td class="r"><b>${fmtNr(T.litri)}</b></td><td class="r"><b>${fmtLei(T.valoare)}</b></td><td class="r"><b>${fmtNr(T0+T.litri)}</b></td><td class="r"><b>${f(T.oreSS)}</b></td><td class="r"><b>${f(T.oreIP)}</b></td><td class="r"><b>${f(T.consumOre)}</b></td><td class="r"><b>${f(T.parcursCurse)}</b></td><td class="r"><b>${f(T.consumCurse)}</b></td><td class="r"><b>${fmtNr(T.consum)}</b></td><td class="r"><b>${fmtNr(T1)}</b></td></tr></tbody></table>
     ${Object.keys(pers).length?`<div style="font-weight:700; margin:14px 0 6px;">Pe persoane (cine a condus)</div><table style="width:auto; min-width:60%;"><thead><tr><th>Instructor / șofer</th><th>Mașini</th><th>Ore SS</th><th>Ore IP</th><th>Curse</th><th>Km curse</th><th>Consum (l)</th></tr></thead><tbody>
       ${Object.entries(pers).sort((a,b)=>a[0].localeCompare(b[0],'ro')).map(([k,x])=>`<tr><td>${esc(k)}</td><td>${[...x.veh].map(esc).join(', ')}</td><td class="r">${f(x.ss)}</td><td class="r">${f(x.ip)}</td><td class="r">${f(x.cu)}</td><td class="r">${f(x.km)}</td><td class="r">${fmtNr(x.l)}</td></tr>`).join('')}</tbody></table>`:''}`
     :'<p style="text-align:center;">Nicio mașină cu normă de consum sau cu alimentări în luna aleasă.</p>'}
+    ${l.length?`<div style="font-weight:700; margin:14px 0 6px;">Alimentări în ${numeLuna(luna).toLowerCase()}</div>
+    <table><thead><tr><th>Autovehicul</th><th>Data</th><th>Litri</th><th>Valoare (lei)</th><th>Bon / factură / card</th></tr></thead><tbody>
+    ${l.map(v=>{ const b=bilant(v,de,pana), s0=stocLa(v,de); const al=b.al.slice().sort((x,y)=>x.data.localeCompare(y.data)); const n=al.length+3;
+      return `<tr><td rowspan="${n}" style="white-space:nowrap; vertical-align:top;"><b>${esc(v.nr)}</b><div style="font-size:9px;">${esc(v.marca)}</div></td><td colspan="1"><i>Rămas din luna trecută</i></td><td class="r">${fmtNr(s0)}</td><td></td><td></td></tr>
+        ${al.map(a=>`<tr><td class="c">${fmtData(a.data)}</td><td class="r">${fmtNr(nr(a.litri))}</td><td class="r">${a.valoare?fmtLei(nr(a.valoare)):'—'}</td><td>${esc(a.document)}</td></tr>`).join('')}
+        <tr><td><b>Total disponibil</b></td><td class="r"><b>${fmtNr(s0+b.litri)}</b></td><td class="r"><b>${b.valoare?fmtLei(b.valoare):''}</b></td><td style="font-size:9.5px;">rămas ${fmtNr(s0)} + alimentat ${fmtNr(b.litri)} l</td></tr>
+        <tr><td>Rămâne pentru luna următoare</td><td class="r ${s0+b.litri-b.consum<0?'rd':''}">${fmtNr(s0+b.litri-b.consum)}</td><td></td><td style="font-size:9.5px;">după consumul normat de ${fmtNr(b.consum)} l</td></tr>`; }).join('')}
+    </tbody></table>`:''}
     <div class="r-leg">Consum ore de conducere = ore × norma SS sau IP a mașinii (l/oră). Consum curse = km × norma / 100 (la utilaje: ore funcționare × normă). Stoc final = stoc inițial + alimentat − consum total.</div>
     <div class="r-sem"><span>Întocmit,</span><span>Administrator,</span><span>Director,</span></div></div>`;
 }
