@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Parc auto</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1E2B36">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
+<style id="page-style">@page{size:A4 landscape; margin:10mm;}</style>
+<style>
+  :root{
+    --accent:#1F78C8; --accent-dark:#175E9E;
+    --infield:#1E2B36; --infield-dark:#151F28;
+    --chalk:#F4F5F7; --card:#FFFFFF; --ink:#1D2125; --muted:#677079; --border:#DFE2E6;
+    --yellow:#E3A23C; --danger:#B23A32; --ok:#3D7A4E; --radius:10px;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{margin:0; background:var(--chalk); color:var(--ink); font-family:'Inter',system-ui,sans-serif; -webkit-tap-highlight-color:transparent;}
+  h1,h2,h3,.display{font-family:'Oswald',system-ui,sans-serif; text-transform:uppercase; letter-spacing:0.02em;}
+  #app{display:flex; flex-direction:column; height:100vh;}
+  header{background:var(--infield); color:#fff; display:flex; align-items:center; justify-content:space-between; padding:14px 20px; flex-shrink:0; border-bottom:4px solid var(--accent); gap:10px;}
+  header .title{display:flex; align-items:baseline; gap:10px; min-width:0;}
+  header h1{margin:0; font-size:22px; color:#fff; white-space:nowrap;}
+  header .subtitle{font-size:13px; color:#C3CCD4; font-family:'Inter',sans-serif; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  header .date{font-family:'Oswald',sans-serif; font-size:14px; color:#D9DEE3; white-space:nowrap;}
+  .body-wrap{flex:1; display:flex; overflow:hidden;}
+  nav.sidebar{width:190px; background:var(--infield-dark); flex-shrink:0; display:flex; flex-direction:column; padding:10px 0; overflow-y:auto;}
+  nav.sidebar button{display:flex; align-items:center; gap:10px; width:100%; border:none; background:transparent; color:#C9D2DA; font-family:'Inter',sans-serif; font-size:15px; font-weight:600; padding:14px 18px; cursor:pointer; text-align:left; border-left:4px solid transparent;}
+  nav.sidebar button svg{flex-shrink:0; width:20px; height:20px;}
+  nav.sidebar button.active{background:var(--infield); color:#fff; border-left:4px solid var(--accent);}
+  nav.sidebar button:not(.active):hover{background:rgba(255,255,255,0.06);}
+  .badge{background:var(--danger); color:#fff; border-radius:10px; font-size:11px; padding:1px 7px; margin-left:auto; font-weight:700;}
+  main{flex:1; overflow-y:auto; padding:22px 26px 80px;}
+  main h2{font-size:22px; margin:0 0 4px; color:var(--infield);}
+  main h3{font-size:16px; margin:0 0 10px; color:var(--infield);}
+  .tab-desc{color:var(--muted); font-size:14px; margin:0 0 20px;}
+  nav.bottombar{display:none;}
+  @media (max-width:760px){
+    nav.sidebar{display:none;}
+    main{padding:16px 14px 96px;}
+    header{padding:10px 14px;} header h1{font-size:18px;}
+    header .subtitle, header .date, #btn-save-now span{display:none;}
+    nav.bottombar{display:flex; position:fixed; bottom:0; left:0; right:0; background:var(--infield-dark); border-top:3px solid var(--accent); z-index:20;}
+    nav.bottombar button{flex:1 0 66px; display:flex; flex-direction:column; align-items:center; gap:3px; background:transparent; border:none; color:#C9D2DA; font-size:11.5px; font-weight:600; padding:8px 2px 10px; white-space:nowrap; position:relative;}
+    nav.bottombar button svg{width:20px; height:20px;}
+    nav.bottombar button.active{color:#fff;} nav.bottombar button.active svg{stroke:var(--accent);}
+    nav.bottombar .badge{position:absolute; top:4px; right:12px; margin:0;}
+  }
+  .card{background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:18px; margin-bottom:16px;}
+  .row{display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;}
+  .field{display:flex; flex-direction:column; gap:5px; min-width:0;}
+  .field label{font-size:12px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:0.03em;}
+  input[type=text], input[type=date], input[type=number], select, textarea{font-family:'Inter',sans-serif; font-size:15px; padding:10px 12px; border:1.5px solid var(--border); border-radius:8px; background:#fff; color:var(--ink); min-height:44px; max-width:100%;}
+  textarea{min-height:70px; resize:vertical; width:100%;}
+  input:focus, select:focus, textarea:focus{outline:2px solid var(--accent); outline-offset:1px;}
+  input.sm, select.sm{min-height:36px; padding:5px 8px; font-size:14px;}
+  button.btn{font-family:'Inter',sans-serif; font-weight:700; font-size:14px; padding:11px 18px; border-radius:8px; border:none; cursor:pointer; min-height:44px; white-space:nowrap;}
+  button.btn-primary{background:var(--accent); color:#fff;} button.btn-primary:hover{background:var(--accent-dark);}
+  button.btn-secondary{background:#fff; color:var(--infield); border:1.5px solid var(--infield);}
+  button.btn-ghost{background:transparent; color:var(--muted); border:1px solid var(--border); padding:8px 12px; font-size:13px; min-height:36px;}
+  button.btn-ok{background:var(--ok); color:#fff; padding:6px 12px; font-size:13px; min-height:34px;}
+  button.btn-danger{background:transparent; color:var(--danger); border:1.5px solid var(--danger); padding:8px 12px; font-size:13px; min-height:36px;}
+  button.icon-btn{background:transparent; border:1px solid var(--border); border-radius:8px; color:var(--muted); cursor:pointer; width:36px; height:36px; display:inline-flex; align-items:center; justify-content:center;}
+  button.icon-btn.del{color:var(--danger);}
+  .seg{display:inline-flex; border:1.5px solid var(--infield); border-radius:8px; overflow:hidden; flex-wrap:wrap;}
+  .seg button{border:none; background:#fff; color:var(--infield); font-weight:700; font-size:14px; padding:0 14px; min-height:40px; cursor:pointer; font-family:'Inter',sans-serif;}
+  .seg button.on{background:var(--infield); color:#fff;}
+  .table-wrap{overflow-x:auto; -webkit-overflow-scrolling:touch;}
+  table{width:100%; border-collapse:collapse; font-size:14px;}
+  th{text-align:left; font-family:'Oswald',sans-serif; font-size:12px; letter-spacing:0.04em; text-transform:uppercase; color:var(--muted); border-bottom:2px solid var(--border); padding:8px; white-space:nowrap;}
+  td{padding:9px 8px; border-bottom:1px solid var(--border); vertical-align:middle;}
+  td.num, th.num{text-align:right; font-variant-numeric:tabular-nums;}
+  tr.total td{font-weight:700; border-top:2px solid var(--border); background:#F8F9FA;}
+  tr.clickable{cursor:pointer;} tr.clickable:hover td{background:#F5F8FB;}
+  .empty{text-align:center; padding:40px 20px; color:var(--muted);}
+  .empty .display{font-size:17px; color:var(--infield); margin-bottom:6px;}
+  .pill{display:inline-block; padding:3px 10px; border-radius:20px; font-size:12px; font-weight:600; white-space:nowrap;}
+  .pill-yellow{background:#FBEBD3; color:#8A5A16;} .pill-danger{background:#F6DCDA; color:var(--danger);}
+  .pill-ok{background:#DCEBDF; color:var(--ok);} .pill-ghost{background:#ECEDEF; color:var(--muted);}
+  .pill-dark{background:#E3E7EB; color:var(--infield);} .pill-blue{background:#D9E6F5; color:#123E70;}
+  .stats{display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:12px; margin-bottom:16px;}
+  .stat{background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:14px 16px; border-top:4px solid var(--infield);}
+  .stat .v{font-family:'Oswald',sans-serif; font-size:28px; color:var(--infield); line-height:1.1;}
+  .stat .l{font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.03em; font-weight:600;}
+  .stat.red{border-top-color:var(--danger);} .stat.red .v{color:var(--danger);}
+  .stat.yel{border-top-color:var(--yellow);} .stat.yel .v{color:#8A5A16;}
+  .alert{display:flex; gap:12px; align-items:center; justify-content:space-between; flex-wrap:wrap; padding:12px 16px; border-radius:var(--radius); margin-bottom:12px; font-size:14px;}
+  .alert-danger{background:#F6DCDA; color:#7A1F19;} .alert-yellow{background:#FBEBD3; color:#6B4510;} .alert-blue{background:#D9E6F5; color:#123E70;}
+  .toast{position:fixed; bottom:24px; left:50%; transform:translateX(-50%); background:var(--infield); color:#fff; padding:10px 20px; border-radius:30px; font-size:14px; font-weight:600; box-shadow:0 6px 18px rgba(0,0,0,0.2); z-index:200; opacity:0; pointer-events:none; transition:opacity .25s ease, transform .25s ease; max-width:90vw; text-align:center;}
+  .toast.show{opacity:1; transform:translateX(-50%) translateY(-6px);}
+  .settings-btn{background:transparent; border:none; color:#C3CCD4; cursor:pointer; padding:6px;}
+  .modal-backdrop{position:fixed; inset:0; background:rgba(0,0,0,0.45); display:flex; align-items:center; justify-content:center; z-index:100; padding:16px;}
+  .modal{background:#fff; border-radius:12px; padding:22px; width:min(560px,100%); max-height:92vh; overflow-y:auto;}
+  .modal h3{margin-top:0; color:var(--infield);}
+  .modal .field{margin-bottom:12px;}
+  .modal .field input, .modal .field select, .modal .field textarea{width:100%;}
+  .modal hr{border:none; border-top:1px solid var(--border); margin:16px 0;}
+  .grid2{display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:12px;}
+  .grid2 .field input, .grid2 .field select{width:100%;}
+  .two-col{display:grid; grid-template-columns:1fr 1fr; gap:16px;}
+  @media (max-width:1000px){ .two-col{grid-template-columns:1fr;} }
+  .sec-head{font-family:'Oswald',sans-serif; text-transform:uppercase; color:var(--infield); font-size:14px; margin:18px 0 8px; letter-spacing:.03em;}
+  .muted{color:var(--muted);} .small{font-size:12.5px;}
+  .link{background:none; border:none; padding:0; color:var(--infield); font-weight:700; cursor:pointer; text-align:left; font-size:inherit; font-family:inherit; text-decoration:underline; text-decoration-color:var(--border); text-underline-offset:3px;}
+  .nap{opacity:.55;}
+  /* ---------- RAPOARTE (tipărire / PDF) ---------- */
+  .raport{background:#fff; border:1px solid var(--border); border-radius:6px; padding:24px 26px; margin:0 auto 20px; color:#000; font-family:Arial,Helvetica,sans-serif;}
+  .raport .r-inst{font-weight:700; font-size:13px;}
+  .raport .r-tt{text-align:center; font-weight:700; font-size:18px; margin:12px 0 4px; text-transform:uppercase;}
+  .raport .r-sub{text-align:center; font-size:12px; margin-bottom:12px;}
+  .raport table{font-size:10.5px; font-family:Arial,Helvetica,sans-serif; -webkit-print-color-adjust:exact; print-color-adjust:exact;}
+  .raport th, .raport td{border:1px solid #000; padding:4px 5px; color:#000; text-transform:none; letter-spacing:0; font-family:Arial,Helvetica,sans-serif; font-size:10.5px; vertical-align:middle;}
+  .raport th{font-weight:700; text-align:center; white-space:normal; background:#E9EDF1;}
+  .raport td.c{text-align:center;} .raport td.r{text-align:right; white-space:nowrap;}
+  .raport td.rd{background:#F4C7C3;} .raport td.yl{background:#FCE3B5;}
+  .raport .r-sem{display:flex; justify-content:space-between; margin-top:26px; font-size:12px; padding:0 30px;}
+  .raport .r-leg{font-size:10px; margin-top:6px;}
+  @media print{
+    body{background:#fff;}
+    header, nav, .no-print, .toast{display:none !important;}
+    #app{height:auto; display:block;} .body-wrap{overflow:visible; display:block;} main{overflow:visible; padding:0;}
+    .raport{border:none; padding:0; margin:0;}
+  }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div class="toast" id="toast"></div>
+<input type="file" id="file-json" accept=".json,application/json" style="display:none">
+<input type="file" id="file-xls" accept=".xls,.xlsx" style="display:none">
+<script>
+/* ============================================================
+   PARC AUTO — evidența vehiculelor instituției
+   Aplicație de sine stătătoare, offline după prima deschidere.
+   Datele stau doar pe dispozitiv (localStorage) + backup JSON.
+   ============================================================ */
+const STORAGE_KEY='parc-auto-v1', UI_KEY='parc-auto-ui-v1';
+const DOCS=[
+  {k:'itp',  n:'ITP', s:'ITP', serv:['Obligatorie','ITP']},
+  {k:'rca',  n:'Asigurare RCA', s:'RCA', nr:'Serie / nr. poliță', firma:true, serv:['Asigurare','RCA']},
+  {k:'rov',  n:'Rovinietă', s:'Rovinietă', serv:['Obligatorie','Rovinietă']},
+  {k:'acc',  n:'Asigurare accidente călători', s:'Asig. călători', nr:'Nr. poliță', firma:true, serv:['Asigurare','Asigurare accidente călători']},
+  {k:'cert', n:'Certificat transport propriu (copie conformă)', s:'Cert. transport', nr:'Nr. / data', serv:['Obligatorie','Certificat transport propriu']},
+  {k:'taho', n:'Verificare tahograf', s:'Tahograf', serv:['Obligatorie','Verificare tahograf']},
+];
+const STATUSURI=['Activ','În reparație','Inactiv','Casat'];
+const TIPURI_VEH=['Autoturism','Microbuz','Autoutilitară','Tractor','Remorcă','Semiremorcă','Trailer baloți','Utilaj'];
+const TIPURI_LUCRARE=['Revizie','Revizie anuală','Mentenanță','Reparație mecanică','Reparație electrică','Caroserie','Diagnoză','Vulcanizare','Obligatorie','Asigurare','Altele'];
+const LUNI=['','Ianuarie','Februarie','Martie','Aprilie','Mai','Iunie','Iulie','August','Septembrie','Octombrie','Noiembrie','Decembrie'];
+const LUNI_SC=['','Ian','Feb','Mar','Apr','Mai','Iun','Iul','Aug','Sep','Oct','Noi','Dec'];
+
+/* ---------------- utilitare ---------------- */
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,8); }
+function pad2(n){ return String(n).padStart(2,'0'); }
+function isoDin(d){ return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`; }
+function todayISO(){ return isoDin(new Date()); }
+function esc(s){ return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fmtData(iso){ if(!iso) return '—'; const [y,m,d]=iso.split('-'); return `${d}.${m}.${y}`; }
+function zileIntre(a,b){ return Math.round((new Date(b+'T12:00:00')-new Date(a+'T12:00:00'))/86400000); }
+function nr(v){ const x=parseFloat(String(v??'').replace(/\s/g,'').replace(',','.')); return isNaN(x)?0:x; }
+function fmtNr(x){ return (Math.round(x*100)/100).toLocaleString('ro-RO'); }
+function fmtLei(x){ return (Math.round(x*100)/100).toLocaleString('ro-RO',{minimumFractionDigits:2, maximumFractionDigits:2}); }
+function plusLuni(iso,n){ const d=new Date(iso+'T12:00:00'); const z=d.getDate(); d.setMonth(d.getMonth()+n); if(d.getDate()!==z) d.setDate(0); return isoDin(d); }
+function norm(s){ return String(s??'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/\s+/g,' ').trim(); }
+function nrCheie(s){ return String(s??'').toUpperCase().replace(/[^A-Z0-9]/g,''); }
+
+/* ---------------- stare ---------------- */
+function stareImplicita(){ return { settings:{institutie:'Liceul Tehnologic „Alexandru Vlahuță” Șendriceni', prag:30, pragKm:1000, ultimulExport:''}, vehicule:[], service:[] }; }
+function vehGol(){ const docs={}; DOCS.forEach(d=>docs[d.k]={ap:['itp','rca'].includes(d.k), expira:'', nr:'', firma:''}); return {id:uid(), tip:'Autoturism', marca:'', nr:'', vin:'', certInm:'', civ:'', combustibil:'', departament:'', status:'Activ', responsabil:'', km:'', kmData:'', unitate:'km', revizieKm:'', obs:'', docs, alte:[]}; }
+let state=stareImplicita(), ui={}, currentTab='termene', saveTimer=null, ultimaSalvare=null;
+function migreaza(){
+  state.settings=Object.assign(stareImplicita().settings, state.settings||{});
+  ['vehicule','service'].forEach(k=>{ if(!Array.isArray(state[k])) state[k]=[]; });
+  state.vehicule.forEach(v=>{ const g=vehGol(); Object.keys(g).forEach(k=>{ if(v[k]===undefined) v[k]=g[k]; }); DOCS.forEach(d=>{ if(!v.docs[d.k]) v.docs[d.k]=g.docs[d.k]; }); if(!Array.isArray(v.alte)) v.alte=[]; });
+}
+function loadState(){
+  try{ const r=localStorage.getItem(STORAGE_KEY); if(r) state=JSON.parse(r); }catch(e){}
+  migreaza();
+  try{ const u=JSON.parse(localStorage.getItem(UI_KEY)||'{}'); currentTab=u.currentTab||'termene'; ui=u.ui||{}; }catch(e){}
+}
+function saveNow(){ try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); ultimaSalvare=new Date(); indicator(); return true; }catch(e){ return false; } }
+function save(){ clearTimeout(saveTimer); saveTimer=setTimeout(()=>{ if(!saveNow()) toast('Nu am putut salva pe acest dispozitiv.'); },150); }
+function saveUI(){ try{ localStorage.setItem(UI_KEY, JSON.stringify({currentTab, ui})); }catch(e){} }
+function indicator(){ const el=document.getElementById('save-indicator'); if(el) el.textContent=ultimaSalvare?'Salvat '+ultimaSalvare.toLocaleTimeString('ro-RO',{hour:'2-digit',minute:'2-digit'}):''; }
+window.addEventListener('beforeunload', saveNow);
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden') saveNow(); });
+function toast(msg,ms){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toast._t); toast._t=setTimeout(()=>t.classList.remove('show'), ms||2000); }
+
+/* ---------------- logică ---------------- */
+function vehById(id){ return state.vehicule.find(v=>v.id===id)||null; }
+function vehOrdonate(){ return [...state.vehicule].sort((a,b)=>(STATUSURI.indexOf(a.status)-STATUSURI.indexOf(b.status)) || (a.nrCrt??999)-(b.nrCrt??999) || a.nr.localeCompare(b.nr,'ro')); }
+function vehUrmarit(v){ return v.status!=='Inactiv' && v.status!=='Casat'; }
+function stare(expira){
+  const p=nr(state.settings.prag)||30;
+  if(!expira) return {cls:'pill-danger', txt:'Lipsă dată', z:null, niv:3};
+  const z=zileIntre(todayISO(), expira);
+  if(z<0) return {cls:'pill-danger', txt:`Expirat de ${-z} ${-z===1?'zi':'zile'}`, z, niv:3};
+  if(z===0) return {cls:'pill-danger', txt:'Expiră azi', z, niv:3};
+  if(z<=p) return {cls:'pill-yellow', txt:`Expiră în ${z} ${z===1?'zi':'zile'}`, z, niv:2};
+  return {cls:'pill-ok', txt:`${z} zile`, z, niv:1};
+}
+function stareRevizie(v){
+  if(!v.revizieKm || v.km==='' || v.km==null) return null;
+  const rest=nr(v.revizieKm)-nr(v.km), u=v.unitate==='ore'?'ore':'km';
+  if(rest<=0) return {cls:'pill-danger', txt:`Revizie depășită cu ${fmtNr(-rest)} ${u}`, niv:3, rest};
+  if(rest<=(nr(state.settings.pragKm)||1000)) return {cls:'pill-yellow', txt:`Revizie peste ${fmtNr(rest)} ${u}`, niv:2, rest};
+  return {cls:'pill-ok', txt:`Revizie peste ${fmtNr(rest)} ${u}`, niv:1, rest};
+}
+function termene(){ // toate termenele vehiculelor urmărite
+  const out=[];
+  state.vehicule.filter(vehUrmarit).forEach(v=>{
+    DOCS.forEach(d=>{ const x=v.docs[d.k]; if(x&&x.ap) out.push({v, k:d.k, nume:d.n, scurt:d.s, expira:x.expira, st:stare(x.expira)}); });
+    v.alte.forEach(a=>{ if(a.ap!==false) out.push({v, alt:a.id, nume:a.nume, scurt:a.nume, expira:a.expira, st:stare(a.expira)}); });
+    const r=stareRevizie(v); if(r) out.push({v, rev:true, nume:'Revizie tehnică', scurt:'Revizie', expira:'', st:{...r, z:null}});
+  });
+  return out.sort((a,b)=>b.st.niv-a.st.niv || (a.st.z??-1e9)-(b.st.z??-1e9) || a.v.nr.localeCompare(b.v.nr));
+}
+function celMaiRau(v){ let m=null; termene().filter(t=>t.v===v).forEach(t=>{ if(!m || t.st.niv>m.st.niv || (t.st.niv===m.st.niv && (t.st.z??-1e9)<(m.st.z??-1e9))) m=t; }); return m; }
+function departamente(){ return [...new Set(state.vehicule.map(v=>v.departament).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ro')); }
+function aniService(){ const s=new Set(state.service.filter(x=>x.data).map(x=>x.data.slice(0,4))); s.add(todayISO().slice(0,4)); return [...s].sort().reverse(); }
+function costVeh(v, an){ return state.service.filter(s=>s.vehId===v.id && (!an || (s.data||'').startsWith(an))).reduce((a,s)=>a+nr(s.valoare),0); }
+
+/* ---------------- icoane / taburi ---------------- */
+const ICONS={
+  termene:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M3 9.5h18"/><path d="M8 2.5v4"/><path d="M16 2.5v4"/><path d="M12 13v3"/><circle cx="12" cy="18" r=".6"/></svg>',
+  vehicule:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 17h14v-4l-2-5H7l-2 5z"/><path d="M5 13h14"/><circle cx="8" cy="17" r="1.8"/><circle cx="16" cy="17" r="1.8"/></svg>',
+  service:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a4 4 0 00-5.4 5.2L3 17.8V21h3.2l6.3-6.3a4 4 0 005.2-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/></svg>',
+  rapoarte:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V3h12v6"/><rect x="3" y="9" width="18" height="8" rx="1.5"/><path d="M6 14h12v7H6z"/></svg>',
+  save:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="17" height="17"><path d="M5 3h11l3 3v15H5z"/><path d="M8 3v6h8V3"/><path d="M7 21v-8h10v8"/></svg>',
+  gear:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><circle cx="12" cy="12" r="3"/><path d="M19.4 13a7.6 7.6 0 000-2l2-1.5-2-3.4-2.3.9a7.7 7.7 0 00-1.7-1L15 3h-6l-.4 2.9a7.7 7.7 0 00-1.7 1l-2.3-.9-2 3.4L4.6 11a7.6 7.6 0 000 2l-2 1.5 2 3.4 2.3-.9c.5.4 1.1.8 1.7 1L9 21h6l.4-2.9c.6-.2 1.2-.6 1.7-1l2.3.9 2-3.4z"/></svg>',
+  trash:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M6 7l1 13h10l1-13"/></svg>',
+  edit:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></svg>',
+};
+const TABS=[{id:'termene',label:'Termene'},{id:'vehicule',label:'Vehicule'},{id:'service',label:'Service'},{id:'rapoarte',label:'Rapoarte'}];
+
+/* ================= RANDARE ================= */
+function render(){
+  const urg=termene().filter(t=>t.st.niv>=2).length;
+  const nav=TABS.map(t=>`<button data-tab="${t.id}" class="${currentTab===t.id?'active':''}">${ICONS[t.id]}<span>${t.label}</span>${t.id==='termene'&&urg?`<span class="badge">${urg}</span>`:''}</button>`).join('');
+  document.getElementById('app').innerHTML=`
+    <header>
+      <div class="title"><h1>Parc auto</h1><span class="subtitle">${esc(state.settings.institutie)}</span></div>
+      <div style="display:flex; align-items:center; gap:10px;">
+        <span class="date" id="save-indicator"></span>
+        <button class="btn btn-primary" id="btn-save-now" style="padding:8px 14px; min-height:36px; display:flex; align-items:center; gap:6px;">${ICONS.save}<span>Salvează</span></button>
+        <button class="settings-btn" id="btn-settings" title="Setări">${ICONS.gear}</button>
+      </div>
+    </header>
+    <div class="body-wrap"><nav class="sidebar">${nav}</nav><main id="main"></main></div>
+    <nav class="bottombar">${nav}</nav>`;
+  indicator(); renderTab(); saveUI();
+}
+function renderTab(){
+  const main=document.getElementById('main');
+  if(!state.vehicule.length && currentTab!=='service'){ main.innerHTML=ecranGol(); return; }
+  main.innerHTML=({termene:tabTermene, vehicule:tabVehicule, service:tabService, rapoarte:tabRapoarte}[currentTab]||tabTermene)();
+}
+function goTab(id){ currentTab=id; if(id!=='vehicule') ui.vehDetaliu=null; render(); document.getElementById('main').scrollTop=0; }
+function gol(t,txt){ return `<div class="empty"><div class="display">${t}</div><div>${txt||''}</div></div>`; }
+function ecranGol(){
+  return `<div class="card" style="max-width:640px; margin:30px auto;">
+    <h2>Bun venit</h2>
+    <p>Aplicația ține evidența vehiculelor: termenele (ITP, RCA, rovinietă, asigurări, tahograf), kilometrajul și reviziile, istoricul de service și cheltuielile.</p>
+    <p class="muted small">Cel mai simplu: încarcă fișierul Excel cu baza de date a parcului auto (foile „Parc auto general” și „Istoric service”). Sau adaugă vehiculele unul câte unul.</p>
+    <div class="row" style="margin-top:14px;"><button class="btn btn-primary" data-act="import-xls">Încarcă din Excel</button><button class="btn btn-secondary" data-act="veh-nou">+ Adaugă vehicul</button><button class="btn btn-ghost" data-act="import-json">Am un backup</button></div>
+  </div>`;
+}
+function bannerBackup(){
+  const z=state.settings.ultimulExport?zileIntre(state.settings.ultimulExport, todayISO()):null;
+  if(z!==null && z<14) return '';
+  return `<div class="alert alert-blue"><div>💾 ${z===null?'<b>N-ai făcut încă niciun backup.</b> Datele stau doar pe acest dispozitiv.':`<b>Ultimul backup a fost acum ${z} zile.</b>`}</div><button class="btn btn-primary" data-act="export-json">Exportă backup</button></div>`;
+}
+
+/* ---------------- TERMENE ---------------- */
+function tabTermene(){
+  const all=termene(), dep=ui.termDep||'all', f=ui.termFiltru||'urgente';
+  const vis=all.filter(t=>(dep==='all'||t.v.departament===dep) && (f==='toate' || t.st.niv>=2));
+  const rosii=all.filter(t=>t.st.niv===3).length, gal=all.filter(t=>t.st.niv===2).length;
+  const an=todayISO().slice(0,4), cost=state.service.filter(s=>(s.data||'').startsWith(an)).reduce((a,s)=>a+nr(s.valoare),0);
+  const activ=state.vehicule.filter(vehUrmarit).length;
+  return `<h2>Termene</h2>
+  <p class="tab-desc">Actele și reviziile care trebuie urmărite. Roșu = expirat sau fără dată, galben = expiră în ${state.settings.prag} de zile.</p>
+  ${bannerBackup()}
+  <div class="stats">
+    <div class="stat"><div class="v">${activ}</div><div class="l">Vehicule urmărite</div></div>
+    <div class="stat red"><div class="v">${rosii}</div><div class="l">Expirate / lipsă</div></div>
+    <div class="stat yel"><div class="v">${gal}</div><div class="l">Expiră în ${state.settings.prag} zile</div></div>
+    <div class="stat"><div class="v">${fmtNr(cost)}</div><div class="l">Cheltuieli service ${an} (lei)</div></div>
+  </div>
+  <div class="card">
+    <div class="row" style="margin-bottom:12px; justify-content:space-between;">
+      <div class="seg">${[['urgente','De rezolvat'],['toate','Toate termenele']].map(([k,t])=>`<button data-act="term-f" data-v="${k}" class="${f===k?'on':''}">${t}</button>`).join('')}</div>
+      ${departamente().length>1?`<div class="field"><label>Departament</label><select data-ui="termDep" class="sm"><option value="all">Toate</option>${departamente().map(d=>`<option ${d===dep?'selected':''}>${esc(d)}</option>`).join('')}</select></div>`:''}
+    </div>
+    ${vis.length?`<div class="table-wrap"><table><thead><tr><th>Vehicul</th><th>Act / termen</th><th>Expiră</th><th>Stare</th><th></th></tr></thead><tbody>
+      ${vis.map(t=>`<tr>
+        <td><button class="link" data-act="veh-open" data-id="${t.v.id}">${esc(t.v.nr)}</button><div class="small muted">${esc(t.v.marca)}${t.v.departament?' · '+esc(t.v.departament):''}</div></td>
+        <td>${esc(t.nume)}</td><td>${t.rev?`<span class="small muted">${fmtNr(nr(t.v.km))} / ${fmtNr(nr(t.v.revizieKm))} ${t.v.unitate==='ore'?'ore':'km'}</span>`:fmtData(t.expira)}</td>
+        <td><span class="pill ${t.st.cls}">${t.st.txt}</span></td>
+        <td style="text-align:right;">${t.rev?`<button class="btn btn-ok" data-act="km-upd" data-id="${t.v.id}">Actualizează km</button>`:`<button class="btn btn-ok" data-act="renew" data-id="${t.v.id}" data-k="${t.k||''}" data-alt="${t.alt||''}">Reînnoiește</button>`}</td></tr>`).join('')}
+    </tbody></table></div>`:gol(f==='urgente'?'Totul e în regulă':'Niciun termen', f==='urgente'?`Niciun act expirat sau care expiră în ${state.settings.prag} de zile.`:'')}
+  </div>`;
+}
+
+/* ---------------- VEHICULE ---------------- */
+function tabVehicule(){
+  if(ui.vehDetaliu && vehById(ui.vehDetaliu)) return fisaVehicul(vehById(ui.vehDetaliu));
+  const dep=ui.vehDep||'all';
+  const l=vehOrdonate().filter(v=>dep==='all'||v.departament===dep);
+  return `<h2>Vehicule</h2><p class="tab-desc">Apasă pe un vehicul ca să-i vezi fișa: date, termene, kilometraj, observații și istoricul de service.</p>
+  <div class="card">
+    <div class="row" style="margin-bottom:12px; justify-content:space-between;">
+      <button class="btn btn-primary" data-act="veh-nou">+ Vehicul nou</button>
+      ${departamente().length>1?`<div class="field"><label>Departament</label><select data-ui="vehDep" class="sm"><option value="all">Toate</option>${departamente().map(d=>`<option ${d===dep?'selected':''}>${esc(d)}</option>`).join('')}</select></div>`:''}
+    </div>
+    <div class="table-wrap"><table><thead><tr><th>Nr. înmatriculare</th><th>Tip / model</th><th>Departament</th><th>Responsabil</th><th>Status</th><th>Cel mai apropiat termen</th></tr></thead><tbody>
+    ${l.map(v=>{ const m=celMaiRau(v); return `<tr class="clickable ${vehUrmarit(v)?'':'nap'}" data-act="veh-open" data-id="${v.id}">
+      <td><b>${esc(v.nr)}</b></td><td>${esc(v.tip)}<div class="small muted">${esc(v.marca)}</div></td><td>${esc(v.departament)}</td><td>${esc(v.responsabil)}</td>
+      <td><span class="pill ${v.status==='Activ'?'pill-dark':v.status==='În reparație'?'pill-yellow':'pill-ghost'}">${esc(v.status)}</span></td>
+      <td>${m?`<span class="pill ${m.st.cls}">${esc(m.scurt)}: ${m.st.txt}</span>`:'<span class="muted small">—</span>'}</td></tr>`; }).join('')}
+    </tbody></table></div>
+  </div>`;
+}
+function fld(v, k, lab, o={}){
+  const val=v[k]??'';
+  if(o.opt) return `<div class="field"><label>${lab}</label><select data-veh="${k}" data-id="${v.id}">${o.opt.map(x=>`<option ${x===val?'selected':''}>${esc(x)}</option>`).join('')}</select></div>`;
+  return `<div class="field"><label>${lab}</label><input type="${o.type||'text'}" data-veh="${k}" data-id="${v.id}" value="${esc(val)}" ${o.list?`list="${o.list}"`:''} ${o.ph?`placeholder="${o.ph}"`:''}></div>`;
+}
+function fisaVehicul(v){
+  const serv=state.service.filter(s=>s.vehId===v.id).sort((a,b)=>(b.data||'').localeCompare(a.data||''));
+  const tipuri=[...new Set([...TIPURI_VEH, ...state.vehicule.map(x=>x.tip).filter(Boolean)])];
+  const rev=stareRevizie(v);
+  return `<div class="no-print row" style="margin-bottom:12px; justify-content:space-between;"><button class="btn btn-ghost" data-act="veh-back">← Toate vehiculele</button>
+      <div class="row"><button class="btn btn-secondary" data-act="raport-veh" data-id="${v.id}">Fișa vehiculului (PDF)</button><button class="btn btn-danger" data-act="veh-del" data-id="${v.id}">Șterge vehiculul</button></div></div>
+  <h2>${esc(v.nr)} <span class="muted" style="font-size:16px;">${esc(v.marca)}</span></h2>
+  <p class="tab-desc">Modificările se salvează singure.</p>
+  <datalist id="dl-tip">${tipuri.map(t=>`<option value="${esc(t)}">`).join('')}</datalist>
+  <datalist id="dl-dep">${departamente().map(t=>`<option value="${esc(t)}">`).join('')}</datalist>
+  <div class="card"><h3>Date de identificare</h3><div class="grid2">
+    ${fld(v,'nr','Număr înmatriculare')}${fld(v,'tip','Tip vehicul',{list:'dl-tip'})}${fld(v,'marca','Marcă / model')}
+    ${fld(v,'vin','Serie șasiu (VIN)')}${fld(v,'certInm','Certificat înmatriculare')}${fld(v,'civ','Carte identitate (CIV)')}
+    ${fld(v,'combustibil','Combustibil',{opt:['','Benzină','Diesel','GPL','Hibrid','Electric','-']})}${fld(v,'departament','Departament',{list:'dl-dep'})}
+    ${fld(v,'responsabil','Responsabil')}${fld(v,'status','Status',{opt:STATUSURI})}
+  </div></div>
+  <div class="card"><h3>Termene</h3>
+    <div class="table-wrap"><table><thead><tr><th>Act</th><th>Se aplică</th><th>Serie / nr.</th><th>Societate</th><th>Expiră</th><th>Stare</th><th></th></tr></thead><tbody>
+    ${DOCS.map(d=>{ const x=v.docs[d.k]; const st=x.ap?stare(x.expira):null; return `<tr class="${x.ap?'':'nap'}">
+      <td><b>${d.n}</b></td>
+      <td><select class="sm" data-doc="ap" data-k="${d.k}" data-id="${v.id}"><option value="1" ${x.ap?'selected':''}>Da</option><option value="0" ${x.ap?'':'selected'}>Nu este cazul</option></select></td>
+      <td>${x.ap&&d.nr?`<input class="sm" type="text" data-doc="nr" data-k="${d.k}" data-id="${v.id}" value="${esc(x.nr)}" style="width:150px;">`:''}</td>
+      <td>${x.ap&&d.firma?`<input class="sm" type="text" data-doc="firma" data-k="${d.k}" data-id="${v.id}" value="${esc(x.firma)}" style="width:140px;">`:''}</td>
+      <td>${x.ap?`<input class="sm" type="date" data-doc="expira" data-k="${d.k}" data-id="${v.id}" value="${x.expira||''}">`:''}</td>
+      <td>${st?`<span class="pill ${st.cls}">${st.txt}</span>`:'<span class="small muted">nu este cazul</span>'}</td>
+      <td style="text-align:right;">${x.ap?`<button class="btn btn-ok" data-act="renew" data-id="${v.id}" data-k="${d.k}">Reînnoiește</button>`:''}</td></tr>`; }).join('')}
+    ${v.alte.map(a=>{ const st=stare(a.expira); return `<tr><td><input class="sm" type="text" data-alt="nume" data-a="${a.id}" data-id="${v.id}" value="${esc(a.nume)}" style="width:170px; font-weight:700;"></td><td><span class="small muted">act adăugat</span></td><td></td><td></td>
+      <td><input class="sm" type="date" data-alt="expira" data-a="${a.id}" data-id="${v.id}" value="${a.expira||''}"></td><td><span class="pill ${st.cls}">${st.txt}</span></td>
+      <td style="text-align:right; white-space:nowrap;"><button class="btn btn-ok" data-act="renew" data-id="${v.id}" data-alt="${a.id}">Reînnoiește</button> <button class="icon-btn del" data-act="alt-del" data-id="${v.id}" data-a="${a.id}">${ICONS.trash}</button></td></tr>`; }).join('')}
+    </tbody></table></div>
+    <div class="row" style="margin-top:12px;"><div class="field" style="flex:1 1 200px;"><label>Alt act cu termen</label><input type="text" id="alt-nume" list="dl-alte" placeholder="ex: Trusă medicală, Stingător, Autorizație"></div><div class="field"><label>Expiră</label><input type="date" id="alt-exp"></div><button class="btn btn-secondary" data-act="alt-add" data-id="${v.id}">Adaugă</button></div>
+    <datalist id="dl-alte">${['Trusă medicală','Stingător','Autorizație școală','Licență transport','CASCO','Verificare ISCIR'].map(x=>`<option value="${x}">`).join('')}</datalist>
+  </div>
+  <div class="two-col">
+    <div class="card"><h3>Kilometraj și revizie</h3>
+      <div class="grid2">
+        <div class="field"><label>Unitate</label><select data-veh="unitate" data-id="${v.id}"><option value="km" ${v.unitate!=='ore'?'selected':''}>Kilometri</option><option value="ore" ${v.unitate==='ore'?'selected':''}>Ore funcționare</option></select></div>
+        ${fld(v,'km', v.unitate==='ore'?'Ore la bord':'Km la bord',{type:'number'})}${fld(v,'kmData','Citit la data',{type:'date'})}${fld(v,'revizieKm', 'Următoarea revizie la ('+(v.unitate==='ore'?'ore':'km')+')',{type:'number'})}
+      </div>
+      ${rev?`<p style="margin:12px 0 0;"><span class="pill ${rev.cls}">${rev.txt}</span></p>`:'<p class="small muted" style="margin:12px 0 0;">Completează km la bord și km la care se face revizia, ca să primești alertă.</p>'}
+    </div>
+    <div class="card"><h3>Observații / defecțiuni</h3><textarea data-veh="obs" data-id="${v.id}" placeholder="ex: încuietoare portbagaj defectă">${esc(v.obs)}</textarea></div>
+  </div>
+  <div class="card"><div class="row" style="justify-content:space-between; margin-bottom:8px;"><h3 style="margin:0;">Istoric service și reparații</h3><button class="btn btn-secondary" data-act="serv-nou" data-id="${v.id}">+ Lucrare</button></div>
+    ${serv.length?tabelService(serv,false):'<p class="muted small">Nicio lucrare trecută.</p>'}
+  </div>`;
+}
+
+/* ---------------- SERVICE ---------------- */
+function tabelService(l, cuVeh){
+  const tot=l.reduce((a,s)=>a+nr(s.valoare),0);
+  return `<div class="table-wrap"><table><thead><tr><th>Data</th>${cuVeh?'<th>Vehicul</th>':''}<th>Tip lucrare</th><th>Descriere</th><th class="num">Valoare (lei)</th><th>Furnizor / document</th><th></th></tr></thead><tbody>
+  ${l.map(s=>{ const v=vehById(s.vehId); return `<tr><td style="white-space:nowrap;">${fmtData(s.data)}</td>${cuVeh?`<td>${v?`<button class="link" data-act="veh-open" data-id="${v.id}">${esc(v.nr)}</button>`:'—'}</td>`:''}
+    <td>${esc(s.tip)}</td><td>${esc(s.descriere)}</td><td class="num">${s.valoare!==''&&s.valoare!=null?fmtLei(nr(s.valoare)):'—'}</td><td class="small">${esc(s.document)}</td>
+    <td style="text-align:right; white-space:nowrap;"><button class="icon-btn" data-act="serv-edit" data-s="${s.id}">${ICONS.edit}</button> <button class="icon-btn del" data-act="serv-del" data-s="${s.id}">${ICONS.trash}</button></td></tr>`; }).join('')}
+  <tr class="total"><td colspan="${cuVeh?4:3}">Total (${l.length} ${l.length===1?'lucrare':'lucrări'})</td><td class="num">${fmtLei(tot)}</td><td colspan="2"></td></tr>
+  </tbody></table></div>`;
+}
+function tabService(){
+  const an=ui.servAn||'all', vid=ui.servVeh||'all', tip=ui.servTip||'all';
+  const l=state.service.filter(s=>(an==='all'||(an==='fara'?!s.data:(s.data||'').startsWith(an))) && (vid==='all'||s.vehId===vid) && (tip==='all'||s.tip===tip))
+    .sort((a,b)=>(b.data||'').localeCompare(a.data||''));
+  const tipuri=[...new Set([...TIPURI_LUCRARE, ...state.service.map(s=>s.tip).filter(Boolean)])];
+  return `<h2>Service și reparații</h2><p class="tab-desc">Toate lucrările, ITP-urile, asigurările și rovinietele plătite, cu valoarea și documentul.</p>
+  <div class="card"><h3>Lucrare nouă</h3>${formService({}, tipuri)}<div class="row" style="margin-top:10px;"><button class="btn btn-primary" data-act="serv-add">Adaugă lucrarea</button></div></div>
+  <div class="card">
+    <div class="row" style="margin-bottom:12px;">
+      <div class="field"><label>Anul</label><select data-ui="servAn" class="sm"><option value="all">Toți anii</option>${aniService().map(a=>`<option ${a===an?'selected':''}>${a}</option>`).join('')}${state.service.some(s=>!s.data)?`<option value="fara" ${an==='fara'?'selected':''}>Fără dată</option>`:''}</select></div>
+      <div class="field"><label>Vehicul</label><select data-ui="servVeh" class="sm"><option value="all">Toate</option>${vehOrdonate().map(v=>`<option value="${v.id}" ${v.id===vid?'selected':''}>${esc(v.nr)}</option>`).join('')}</select></div>
+      <div class="field"><label>Tip lucrare</label><select data-ui="servTip" class="sm"><option value="all">Toate</option>${tipuri.map(t=>`<option ${t===tip?'selected':''}>${esc(t)}</option>`).join('')}</select></div>
+    </div>
+    ${l.length?tabelService(l,true):gol('Nicio lucrare','Nu există lucrări pentru filtrul ales.')}
+  </div>`;
+}
+function formService(s, tipuri, pre){
+  pre=pre||'s';
+  return `<datalist id="dl-tl-${pre}">${tipuri.map(t=>`<option value="${esc(t)}">`).join('')}</datalist><div class="grid2">
+    <div class="field"><label>Vehicul</label><select id="${pre}-veh">${vehOrdonate().map(v=>`<option value="${v.id}" ${v.id===(s.vehId||ui.servUltimVeh)?'selected':''}>${esc(v.nr)} · ${esc(v.marca)}</option>`).join('')}</select></div>
+    <div class="field"><label>Data</label><input type="date" id="${pre}-data" value="${s.data??todayISO()}"></div>
+    <div class="field"><label>Tip lucrare</label><input type="text" id="${pre}-tip" list="dl-tl-${pre}" value="${esc(s.tip||'')}" placeholder="ex: Reparație mecanică"></div>
+    <div class="field"><label>Valoare totală (lei)</label><input type="number" id="${pre}-val" step="0.01" min="0" value="${s.valoare??''}"></div>
+  </div>
+  <div class="grid2" style="margin-top:12px; grid-template-columns:2fr 1fr;">
+    <div class="field"><label>Descriere detaliată</label><input type="text" id="${pre}-desc" value="${esc(s.descriere||'')}" placeholder="ex: înlocuit plăcuțe frână față"></div>
+    <div class="field"><label>Furnizor / nr. factură</label><input type="text" id="${pre}-doc" value="${esc(s.document||'')}" placeholder="ex: SC RAILEX SRL, FF 123"></div>
+  </div>`;
+}
+function citesteService(pre){
+  const g=id=>document.getElementById(pre+'-'+id).value;
+  return {vehId:g('veh'), data:g('data'), tip:g('tip').trim(), valoare:g('val'), descriere:g('desc').trim(), document:g('doc').trim()};
+}
+
+/* ---------------- RAPOARTE ---------------- */
+function tabRapoarte(){
+  const v=ui.raport||'situatie';
+  const opt=[['situatie','Situația parcului'],['termene','Termene apropiate'],['cheltuieli','Cheltuieli pe an'],['fisa','Fișa unui vehicul']];
+  let filtre='', corp='';
+  if(v==='situatie'){ corp=raportSituatie(); }
+  else if(v==='termene'){ const z=ui.raportZile||60; filtre=`<div class="field"><label>Expiră în următoarele</label><select data-ui="raportZile" class="sm">${[30,60,90,180].map(x=>`<option value="${x}" ${x==z?'selected':''}>${x} de zile</option>`).join('')}</select></div>`; corp=raportTermene(z); }
+  else if(v==='cheltuieli'){ const an=ui.raportAn||todayISO().slice(0,4); filtre=`<div class="field"><label>Anul</label><select data-ui="raportAn" class="sm">${aniService().map(a=>`<option ${a===an?'selected':''}>${a}</option>`).join('')}</select></div>`; corp=raportCheltuieli(an); }
+  else { const id=ui.raportVeh||(vehOrdonate()[0]||{}).id; filtre=`<div class="field"><label>Vehicul</label><select data-ui="raportVeh" class="sm">${vehOrdonate().map(x=>`<option value="${x.id}" ${x.id===id?'selected':''}>${esc(x.nr)} · ${esc(x.marca)}</option>`).join('')}</select></div>`; corp=raportVehicul(vehById(id)); }
+  return `<div class="no-print"><h2>Rapoarte</h2><p class="tab-desc">Situații gata de tipărit sau de salvat ca PDF (de trimis pe e-mail sau WhatsApp).</p>
+    <div class="seg" style="margin-bottom:14px;">${opt.map(([k,t])=>`<button data-act="raport-tip" data-v="${k}" class="${v===k?'on':''}">${t}</button>`).join('')}</div>
+    <div class="row" style="margin-bottom:14px;">${filtre}<button class="btn btn-primary" data-act="pdf">Salvează PDF</button><button class="btn btn-secondary" data-act="print">Tipărește</button></div></div>
+    ${corp}`;
+}
+function orientareRaport(){ const v=ui.raport||'situatie'; return (v==='situatie'||v==='cheltuieli')?'landscape':'portrait'; }
+function capRaport(titlu, sub){ return `<div class="r-inst">${esc(state.settings.institutie)}</div><div class="r-tt">${titlu}</div><div class="r-sub">${sub||''}</div>`; }
+function celTermen(v,k){
+  const x=v.docs[k]; if(!x||!x.ap) return '<td class="c">n.c.</td>';
+  const st=stare(x.expira); const cls=st.niv===3?'rd':st.niv===2?'yl':'';
+  return `<td class="c ${cls}">${x.expira?fmtData(x.expira)+`<br><span style="font-size:9px;">${st.z<0?'expirat':st.z+' zile'}</span>`:'lipsă'}</td>`;
+}
+function raportSituatie(){
+  const l=vehOrdonate().filter(v=>v.status!=='Casat');
+  return `<div class="raport" style="max-width:1120px;">${capRaport('Situația parcului auto', 'la data de '+fmtData(todayISO()))}
+    <table><thead><tr><th>Nr.</th><th>Tip</th><th>Marcă / model</th><th>Nr. înmatr.</th><th>Departament</th><th>Responsabil</th><th>Status</th>${DOCS.map(d=>`<th>${d.s}</th>`).join('')}<th>Km / ore</th><th>Revizie la</th><th>Observații</th></tr></thead><tbody>
+    ${l.map((v,i)=>{ const r=stareRevizie(v); return `<tr><td class="c">${i+1}</td><td>${esc(v.tip)}</td><td>${esc(v.marca)}</td><td style="white-space:nowrap;"><b>${esc(v.nr)}</b></td><td>${esc(v.departament)}</td><td>${esc(v.responsabil)}</td><td class="c">${esc(v.status)}</td>
+      ${DOCS.map(d=>celTermen(v,d.k)).join('')}<td class="r">${v.km!==''&&v.km!=null?fmtNr(nr(v.km)):'—'}</td><td class="r ${r&&r.niv===3?'rd':r&&r.niv===2?'yl':''}">${v.revizieKm?fmtNr(nr(v.revizieKm)):'—'}</td><td style="font-size:9.5px;">${esc(v.obs)}${v.alte.length?(v.obs?'<br>':'')+v.alte.map(a=>`${esc(a.nume)}: ${fmtData(a.expira)}`).join('; '):''}</td></tr>`; }).join('')}
+    </tbody></table>
+    <div class="r-leg">Legendă: roșu = expirat sau fără dată; galben = expiră în ${state.settings.prag} de zile; n.c. = nu este cazul.</div>
+    <div class="r-sem"><span>Întocmit,</span><span>Director,</span></div></div>`;
+}
+function raportTermene(z){
+  const l=termene().filter(t=>!t.rev && (t.st.z===null || t.st.z<=z));
+  return `<div class="raport" style="max-width:780px;">${capRaport('Termene expirate și apropiate', `expirate, fără dată sau care expiră până la ${fmtData(plusZileISO(todayISO(),z))}`)}
+    ${l.length?`<table><thead><tr><th>Nr.</th><th>Vehicul</th><th>Departament</th><th>Act</th><th>Expiră</th><th>Situație</th><th>Responsabil</th></tr></thead><tbody>
+    ${l.map((t,i)=>`<tr><td class="c">${i+1}</td><td><b>${esc(t.v.nr)}</b> ${esc(t.v.marca)}</td><td>${esc(t.v.departament)}</td><td>${esc(t.nume)}</td><td class="c ${t.st.niv===3?'rd':t.st.niv===2?'yl':''}">${fmtData(t.expira)}</td><td>${t.st.txt}</td><td>${esc(t.v.responsabil)}</td></tr>`).join('')}
+    </tbody></table>`:'<p style="text-align:center;">Niciun termen în perioada aleasă.</p>'}
+    <div class="r-sem"><span>Întocmit,</span><span>Director,</span></div></div>`;
+}
+function plusZileISO(iso,n){ const d=new Date(iso+'T12:00:00'); d.setDate(d.getDate()+n); return isoDin(d); }
+function raportCheltuieli(an){
+  const s=state.service.filter(x=>(x.data||'').startsWith(an));
+  const veh=vehOrdonate().filter(v=>s.some(x=>x.vehId===v.id));
+  const lun=(v,m)=>s.filter(x=>x.vehId===v.id && +x.data.slice(5,7)===m).reduce((a,x)=>a+nr(x.valoare),0);
+  const totL=m=>s.filter(x=>+x.data.slice(5,7)===m).reduce((a,x)=>a+nr(x.valoare),0);
+  const tot=s.reduce((a,x)=>a+nr(x.valoare),0);
+  const peTip={}; s.forEach(x=>{ const k=x.tip||'(fără tip)'; peTip[k]=(peTip[k]||0)+nr(x.valoare); });
+  const peDep={}; s.forEach(x=>{ const v=vehById(x.vehId); const k=(v&&v.departament)||'(fără departament)'; peDep[k]=(peDep[k]||0)+nr(x.valoare); });
+  const f=x=>x?fmtLei(x):'';
+  return `<div class="raport" style="max-width:1120px;">${capRaport('Cheltuieli cu parcul auto — anul '+an, 'service, reparații, ITP, asigurări, roviniete (lei)')}
+    ${s.length?`<table><thead><tr><th>Vehicul</th>${LUNI_SC.slice(1).map(l=>`<th>${l}</th>`).join('')}<th>Total</th></tr></thead><tbody>
+    ${veh.map(v=>`<tr><td style="white-space:nowrap;"><b>${esc(v.nr)}</b> <span style="font-size:9px;">${esc(v.marca)}</span></td>${[1,2,3,4,5,6,7,8,9,10,11,12].map(m=>`<td class="r">${f(lun(v,m))}</td>`).join('')}<td class="r"><b>${fmtLei(costVeh(v,an))}</b></td></tr>`).join('')}
+    <tr><td><b>TOTAL</b></td>${[1,2,3,4,5,6,7,8,9,10,11,12].map(m=>`<td class="r"><b>${f(totL(m))}</b></td>`).join('')}<td class="r"><b>${fmtLei(tot)}</b></td></tr>
+    </tbody></table>
+    <div style="display:flex; gap:24px; margin-top:14px; flex-wrap:wrap;">
+      <table style="width:auto; min-width:300px;"><thead><tr><th>Tip lucrare</th><th>Total (lei)</th></tr></thead><tbody>${Object.entries(peTip).sort((a,b)=>b[1]-a[1]).map(([k,x])=>`<tr><td>${esc(k)}</td><td class="r">${fmtLei(x)}</td></tr>`).join('')}</tbody></table>
+      <table style="width:auto; min-width:300px;"><thead><tr><th>Departament</th><th>Total (lei)</th></tr></thead><tbody>${Object.entries(peDep).sort((a,b)=>b[1]-a[1]).map(([k,x])=>`<tr><td>${esc(k)}</td><td class="r">${fmtLei(x)}</td></tr>`).join('')}</tbody></table>
+    </div>`:`<p style="text-align:center;">Nicio cheltuială cu dată în ${an}.</p>`}
+    <div class="r-sem"><span>Întocmit,</span><span>Director,</span></div></div>`;
+}
+function raportVehicul(v){
+  if(!v) return gol('Niciun vehicul','');
+  const serv=state.service.filter(s=>s.vehId===v.id).sort((a,b)=>(b.data||'').localeCompare(a.data||''));
+  const r=(l,x)=>`<tr><td style="width:38%;"><b>${l}</b></td><td>${x||'—'}</td></tr>`;
+  return `<div class="raport" style="max-width:780px;">${capRaport('Fișa vehiculului '+esc(v.nr), 'la data de '+fmtData(todayISO()))}
+    <table><tbody>${r('Tip / marcă / model', esc(v.tip)+' '+esc(v.marca))}${r('Serie șasiu (VIN)',esc(v.vin))}${r('Certificat înmatriculare',esc(v.certInm))}${r('Carte identitate vehicul',esc(v.civ))}${r('Combustibil',esc(v.combustibil))}${r('Departament',esc(v.departament))}${r('Responsabil',esc(v.responsabil))}${r('Status',esc(v.status))}
+    ${r(v.unitate==='ore'?'Ore funcționare':'Kilometraj', v.km!==''&&v.km!=null?fmtNr(nr(v.km))+(v.kmData?' (la '+fmtData(v.kmData)+')':''):'')}${r('Următoarea revizie la', v.revizieKm?fmtNr(nr(v.revizieKm))+' '+(v.unitate==='ore'?'ore':'km'):'')}${r('Observații',esc(v.obs))}</tbody></table>
+    <div style="font-weight:700; margin:14px 0 6px;">Termene</div>
+    <table><thead><tr><th>Act</th><th>Serie / nr.</th><th>Societate</th><th>Expiră</th><th>Situație</th></tr></thead><tbody>
+    ${DOCS.map(d=>{ const x=v.docs[d.k]; if(!x.ap) return `<tr><td>${d.n}</td><td colspan="4" class="c">nu este cazul</td></tr>`; const st=stare(x.expira); return `<tr><td>${d.n}</td><td>${esc(x.nr)}</td><td>${esc(x.firma)}</td><td class="c ${st.niv===3?'rd':st.niv===2?'yl':''}">${fmtData(x.expira)}</td><td>${st.txt}</td></tr>`; }).join('')}
+    ${v.alte.map(a=>{ const st=stare(a.expira); return `<tr><td>${esc(a.nume)}</td><td></td><td></td><td class="c ${st.niv===3?'rd':st.niv===2?'yl':''}">${fmtData(a.expira)}</td><td>${st.txt}</td></tr>`; }).join('')}
+    </tbody></table>
+    <div style="font-weight:700; margin:14px 0 6px;">Istoric service și reparații</div>
+    ${serv.length?`<table><thead><tr><th>Data</th><th>Tip lucrare</th><th>Descriere</th><th>Valoare (lei)</th><th>Furnizor / document</th></tr></thead><tbody>
+    ${serv.map(s=>`<tr><td class="c" style="white-space:nowrap;">${fmtData(s.data)}</td><td>${esc(s.tip)}</td><td>${esc(s.descriere)}</td><td class="r">${s.valoare!==''&&s.valoare!=null?fmtLei(nr(s.valoare)):'—'}</td><td>${esc(s.document)}</td></tr>`).join('')}
+    <tr><td colspan="3"><b>TOTAL</b></td><td class="r"><b>${fmtLei(serv.reduce((a,s)=>a+nr(s.valoare),0))}</b></td><td></td></tr></tbody></table>`:'<p>Nicio lucrare înregistrată.</p>'}
+    <div class="r-sem"><span>Responsabil,</span><span>Administrator,</span></div></div>`;
+}
+
+/* ---------------- PDF / tipărire ---------------- */
+async function salveazaPDF(){
+  if(typeof html2pdf==='undefined') return toast('Pentru PDF e nevoie de internet o singură dată (se încarcă generatorul). Încearcă din nou cu internet.', 4000);
+  const r=document.querySelector('#main .raport'); if(!r) return toast('Nimic de salvat.');
+  const land=orientareRaport()==='landscape', w=land?277:190;
+  const box=document.createElement('div'); box.style.cssText=`width:${w}mm; background:#fff;`;
+  const c=r.cloneNode(true); c.style.cssText=`border:none; padding:0; margin:0; max-width:none; width:${w}mm;`; box.appendChild(c);
+  const v=ui.raport||'situatie';
+  const nume=({situatie:'Situatia-parcului-auto-'+todayISO(), termene:'Termene-parc-auto-'+todayISO(), cheltuieli:'Cheltuieli-parc-auto-'+(ui.raportAn||todayISO().slice(0,4)), fisa:'Fisa-vehicul-'+nrCheie((vehById(ui.raportVeh)||vehOrdonate()[0]||{}).nr)}[v])+'.pdf';
+  toast('Se creează PDF-ul…',1500);
+  try{
+    const blob=await html2pdf().set({margin:10, filename:nume, image:{type:'jpeg',quality:0.96}, html2canvas:{scale:2, backgroundColor:'#ffffff'},
+      jsPDF:{unit:'mm', format:'a4', orientation:land?'landscape':'portrait'}, pagebreak:{mode:['css','legacy'], avoid:'tr'}}).from(box).outputPdf('blob');
+    await partajeazaSauDescarca(new Blob([blob],{type:'application/pdf'}), nume, nume);
+  }catch(e){ console.error(e); toast('Nu am putut crea PDF-ul.'); }
+}
+function tipareste(){ document.getElementById('page-style').textContent=`@page{size:A4 ${orientareRaport()}; margin:10mm;}`; window.print(); }
+async function partajeazaSauDescarca(blob, filename, titlu){
+  try{ const file=new File([blob], filename, {type:blob.type});
+    if(navigator.canShare && navigator.canShare({files:[file]}) && /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent)){ await navigator.share({files:[file], title:titlu}); return 'share'; }
+  }catch(e){ if(e && e.name==='AbortError') return 'cancel'; }
+  const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=filename; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),1000);
+  return 'download';
+}
+
+/* ---------------- MODALE ---------------- */
+function openModal(html){ closeModal(); const b=document.createElement('div'); b.className='modal-backdrop'; b.id='modal'; b.innerHTML=`<div class="modal">${html}</div>`; b.addEventListener('click',e=>{ if(e.target===b) closeModal(); }); document.body.appendChild(b); return b; }
+function closeModal(){ const m=document.getElementById('modal'); if(m) m.remove(); }
+function confirma(msg, onYes, et){ const b=openModal(`<h3>Sigur?</h3><p>${msg}</p><div class="row" style="justify-content:flex-end;"><button class="btn btn-ghost" id="c-no">Nu</button><button class="btn btn-primary" id="c-yes" style="${et?'':'background:var(--danger);'}">${et||'Da, șterge'}</button></div>`); b.querySelector('#c-no').onclick=closeModal; b.querySelector('#c-yes').onclick=()=>{ closeModal(); onYes(); }; }
+function modalVehNou(){
+  const b=openModal(`<h3>Vehicul nou</h3>
+    <div class="field"><label>Număr înmatriculare</label><input type="text" id="vn-nr" placeholder="BT 01 ABC"></div>
+    <div class="field"><label>Tip vehicul</label><input type="text" id="vn-tip" list="dl-tipn" value="Autoturism"><datalist id="dl-tipn">${TIPURI_VEH.map(t=>`<option value="${t}">`).join('')}</datalist></div>
+    <div class="field"><label>Marcă / model</label><input type="text" id="vn-marca" placeholder="Dacia Logan"></div>
+    <p class="small muted">Restul datelor (acte, termene, km) le completezi în fișa vehiculului.</p>
+    <div class="row" style="justify-content:flex-end;"><button class="btn btn-ghost" id="vn-x">Renunță</button><button class="btn btn-primary" id="vn-ok">Adaugă</button></div>`);
+  b.querySelector('#vn-x').onclick=closeModal;
+  b.querySelector('#vn-ok').onclick=()=>{ const n=b.querySelector('#vn-nr').value.trim().toUpperCase(); if(!n) return toast('Scrie numărul de înmatriculare.');
+    if(state.vehicule.some(v=>nrCheie(v.nr)===nrCheie(n))) return toast('Există deja un vehicul cu acest număr.');
+    const v=vehGol(); v.nr=n; v.tip=b.querySelector('#vn-tip').value.trim(); v.marca=b.querySelector('#vn-marca').value.trim(); v.nrCrt=state.vehicule.length+1;
+    state.vehicule.push(v); save(); closeModal(); ui.vehDetaliu=v.id; currentTab='vehicule'; render(); toast('Vehicul adăugat ✓'); };
+  b.querySelector('#vn-nr').focus();
+}
+function modalRenew(v, k, altId){
+  const d=DOCS.find(x=>x.k===k), alt=altId?v.alte.find(a=>a.id===altId):null;
+  const x=alt||v.docs[k], nume=alt?alt.nume:d.n;
+  const b=openModal(`<h3>Reînnoiește: ${esc(nume)}</h3><p class="muted small" style="margin-top:-6px;">${esc(v.nr)} · ${esc(v.marca)} · acum expiră ${fmtData(x.expira)}</p>
+    <div class="row"><div class="field" style="flex:1;"><label>Valabil de la</label><input type="date" id="rn-de" value="${todayISO()}"></div><div class="field" style="flex:1;"><label>Expiră la</label><input type="date" id="rn-exp"></div></div>
+    <div class="row" style="margin:-4px 0 12px; gap:6px;">${[['1 lună',1],['3 luni',3],['6 luni',6],['1 an',12],['2 ani',24]].map(([t,n])=>`<button class="btn btn-ghost" data-luni="${n}">+${t}</button>`).join('')}</div>
+    ${!alt&&d.nr?`<div class="field"><label>${d.nr}</label><input type="text" id="rn-nr" value="${esc(x.nr||'')}"></div>`:''}
+    ${!alt&&d.firma?`<div class="field"><label>Societate / broker</label><input type="text" id="rn-firma" value="${esc(x.firma||'')}"></div>`:''}
+    <hr><p class="small muted" style="margin-top:0;">Opțional: trece și plata în istoricul de service, ca să apară la cheltuieli.</p>
+    <div class="row"><div class="field" style="flex:1;"><label>Cost (lei)</label><input type="number" id="rn-cost" step="0.01" min="0"></div><div class="field" style="flex:2;"><label>Furnizor / document</label><input type="text" id="rn-doc"></div></div>
+    <div class="row" style="justify-content:flex-end; margin-top:12px;"><button class="btn btn-ghost" id="rn-x">Renunță</button><button class="btn btn-primary" id="rn-ok">Salvează</button></div>`);
+  b.querySelectorAll('[data-luni]').forEach(btn=>btn.onclick=()=>{ const de=b.querySelector('#rn-de').value||todayISO(); b.querySelector('#rn-exp').value=plusZileISO(plusLuni(de, +btn.dataset.luni),-1); });
+  b.querySelector('#rn-x').onclick=closeModal;
+  b.querySelector('#rn-ok').onclick=()=>{
+    const exp=b.querySelector('#rn-exp').value; if(!exp) return toast('Alege data de expirare.');
+    x.expira=exp; if(!alt){ x.ap=true; if(d.nr) x.nr=b.querySelector('#rn-nr').value.trim(); if(d.firma) x.firma=b.querySelector('#rn-firma').value.trim(); }
+    const cost=b.querySelector('#rn-cost').value, docu=b.querySelector('#rn-doc').value.trim();
+    if(cost||docu){ const [tip,desc]=alt?['Obligatorie',alt.nume]:d.serv; state.service.push({id:uid(), vehId:v.id, data:b.querySelector('#rn-de').value||todayISO(), tip, descriere:desc+(x.nr?' '+x.nr:''), valoare:cost, document:docu}); }
+    save(); closeModal(); render(); toast('Termen actualizat ✓'); };
+}
+function modalKm(v){
+  const u=v.unitate==='ore'?'ore':'km';
+  const b=openModal(`<h3>${esc(v.nr)}: ${u} și revizie</h3>
+    <div class="row"><div class="field" style="flex:1;"><label>${u==='ore'?'Ore':'Km'} la bord acum</label><input type="number" id="k-km" value="${esc(v.km)}"></div><div class="field" style="flex:1;"><label>Următoarea revizie la</label><input type="number" id="k-rev" value="${esc(v.revizieKm)}"></div></div>
+    <p class="small muted">Dacă tocmai s-a făcut revizia, mărește „Următoarea revizie la” (de ex. +15.000 km) și trece lucrarea în Service.</p>
+    <div class="row" style="justify-content:flex-end;"><button class="btn btn-ghost" id="k-x">Renunță</button><button class="btn btn-primary" id="k-ok">Salvează</button></div>`);
+  b.querySelector('#k-x').onclick=closeModal;
+  b.querySelector('#k-ok').onclick=()=>{ v.km=b.querySelector('#k-km').value; v.kmData=todayISO(); v.revizieKm=b.querySelector('#k-rev').value; save(); closeModal(); render(); toast('Salvat ✓'); };
+}
+function modalServEdit(s){
+  const tipuri=[...new Set([...TIPURI_LUCRARE, ...state.service.map(x=>x.tip).filter(Boolean)])];
+  const b=openModal(`<h3>Modifică lucrarea</h3>${formService(s,tipuri,'e')}<div class="row" style="justify-content:flex-end; margin-top:14px;"><button class="btn btn-ghost" id="e-x">Renunță</button><button class="btn btn-primary" id="e-ok">Salvează</button></div>`);
+  b.querySelector('#e-x').onclick=closeModal;
+  b.querySelector('#e-ok').onclick=()=>{ Object.assign(s, citesteService('e')); save(); closeModal(); render(); toast('Salvat ✓'); };
+}
+function modalServNou(vehId){
+  ui.servUltimVeh=vehId;
+  const tipuri=[...new Set([...TIPURI_LUCRARE, ...state.service.map(x=>x.tip).filter(Boolean)])];
+  const b=openModal(`<h3>Lucrare nouă</h3>${formService({vehId},tipuri,'n')}<div class="row" style="justify-content:flex-end; margin-top:14px;"><button class="btn btn-ghost" id="n-x">Renunță</button><button class="btn btn-primary" id="n-ok">Adaugă</button></div>`);
+  b.querySelector('#n-x').onclick=closeModal;
+  b.querySelector('#n-ok').onclick=()=>{ const s=citesteService('n'); if(!s.descriere&&!s.tip) return toast('Scrie tipul sau descrierea lucrării.'); state.service.push({id:uid(), ...s}); save(); closeModal(); render(); toast('Lucrare adăugată ✓'); };
+}
+function modalSetari(){
+  const s=state.settings;
+  const b=openModal(`<h3>Setări</h3>
+    <div class="field"><label>Instituția</label><input type="text" id="st-inst" value="${esc(s.institutie)}"></div>
+    <div class="row"><div class="field" style="flex:1;"><label>Alertă cu câte zile înainte</label><input type="number" id="st-prag" value="${esc(s.prag)}" min="1"></div><div class="field" style="flex:1;"><label>Alertă revizie cu (km / ore) înainte</label><input type="number" id="st-km" value="${esc(s.pragKm)}" min="0"></div></div>
+    <div class="row" style="justify-content:flex-end;"><button class="btn btn-primary" id="st-ok">Salvează setările</button></div>
+    <hr><h3 style="font-size:14px;">Backup</h3>
+    <p class="small muted">Datele stau doar pe acest dispozitiv. Exportă un backup din când în când (îl poți trimite pe e-mail sau ține pe stick) și îl poți importa pe alt calculator sau telefon.</p>
+    <div class="row"><button class="btn btn-secondary" data-act="export-json">Exportă backup</button><button class="btn btn-ghost" data-act="import-json">Importă backup</button></div>
+    <hr><h3 style="font-size:14px;">Excel</h3>
+    <p class="small muted">Încarcă fișierul „Baza de date parc auto” (.xls / .xlsx). Vehiculele existente cu același număr se actualizează, cele noi se adaugă; istoricul de service se completează fără dubluri.</p>
+    <div class="row"><button class="btn btn-secondary" data-act="import-xls">Încarcă din Excel</button></div>
+    <hr><div class="row"><button class="btn btn-danger" data-act="sterge-tot">Șterge toate datele</button></div>`);
+  b.querySelector('#st-ok').onclick=()=>{ s.institutie=b.querySelector('#st-inst').value.trim()||s.institutie; s.prag=Math.max(1,nr(b.querySelector('#st-prag').value)||30); s.pragKm=nr(b.querySelector('#st-km').value); save(); closeModal(); render(); toast('Setări salvate ✓'); };
+}
+
+/* ---------------- BACKUP ---------------- */
+async function exportJson(){
+  const r=await partajeazaSauDescarca(new Blob([JSON.stringify(state,null,1)],{type:'application/json'}), `parc-auto-backup-${todayISO()}.json`, 'Backup parc auto');
+  if(r!=='cancel'){ state.settings.ultimulExport=todayISO(); save(); render(); toast('Backup exportat ✓'); }
+}
+function importJson(file){
+  const rd=new FileReader();
+  rd.onload=()=>{ try{ const p=JSON.parse(rd.result); if(!p||!Array.isArray(p.vehicule)) throw 0;
+      confirma(`Backup-ul are ${p.vehicule.length} vehicule și ${(p.service||[]).length} lucrări. Tot ce e acum pe acest dispozitiv va fi înlocuit.`, ()=>{ state=Object.assign(stareImplicita(), p); migreaza(); saveNow(); render(); toast('Backup importat ✓'); }, 'Da, importă');
+    }catch(e){ toast('Fișierul nu este un backup valid.'); } };
+  rd.readAsText(file);
+}
+
+/* ---------------- IMPORT EXCEL ---------------- */
+function valData(x){
+  if(x instanceof Date && !isNaN(x)) return isoDin(new Date(x.getTime()+12*3600e3));
+  if(typeof x==='number' && x>20000 && x<80000){ const d=new Date(Math.round((x-25569)*86400e3)+12*3600e3); return `${d.getUTCFullYear()}-${pad2(d.getUTCMonth()+1)}-${pad2(d.getUTCDate())}`; }
+  const m=String(x??'').match(/(\d{1,2})[./-](\d{1,2})[./-](\d{4})/); if(m) return `${m[3]}-${pad2(m[2])}-${pad2(m[1])}`;
+  return '';
+}
+function txt(x){ if(x==null) return ''; if(x instanceof Date) return fmtData(valData(x)); const s=String(x).trim(); return (s==='-'||s==='—')?'':s; }
+function eNC(x){ return /nu este cazul|^n\.?\s?c\.?$/.test(norm(x)); }
+function gasesteTabel(wb, cuvinte){
+  for(const n of wb.SheetNames){ const rows=XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1, raw:true, defval:''});
+    for(let i=0;i<Math.min(rows.length,30);i++){ const h=rows[i].map(norm); if(cuvinte.every(c=>h.some(x=>x.includes(c)))) return {rows, i, h}; } }
+  return null;
+}
+function col(h, cuv, occ){ let c=0; for(let i=0;i<h.length;i++){ if(h[i].includes(cuv)){ if(c===(occ||0)) return i; c++; } } return -1; }
+function importXls(file){
+  if(typeof XLSX==='undefined') return toast('Pentru citirea Excel e nevoie de internet o singură dată. Încearcă din nou cu internet.', 4000);
+  const rd=new FileReader();
+  rd.onload=()=>{
+    let wb; try{ wb=XLSX.read(new Uint8Array(rd.result),{type:'array', cellDates:true}); }catch(e){ return toast('Nu am putut citi fișierul Excel.'); }
+    const P=gasesteTabel(wb,['numar inmatriculare','tip vehicul']);
+    if(!P) return toast('Nu am găsit tabelul cu vehiculele (coloanele „Tip vehicul” și „Număr înmatriculare”).', 4500);
+    const h=P.h, C={tip:col(h,'tip vehicul'), marca:col(h,'marca'), nr:col(h,'numar inmatriculare'), vin:col(h,'serie sasiu'), cert:col(h,'certificat inmatriculare'), civ:col(h,'carte identitate'),
+      comb:col(h,'combustibil'), dep:col(h,'departament'), status:col(h,'status'), itp:col(h,'expirare itp'), rcaNr:col(h,'polita rca'), rcaF:col(h,'societate',0), rcaE:col(h,'expirare asigurare rca'),
+      rov:col(h,'rovin'), rev:col(h,'urmatoarea revizie'), km:col(h,'kilometraj'), resp:col(h,'responsabil'), accNr:col(h,'accidente calatori'), accF:col(h,'societate',1), accE:col(h,'expirare asigurare accidente'),
+      certNr:col(h,'certificat transport'), certE:col(h,'expirare certificat'), taho:col(h,'tahograf'), alte:col(h,'alte detalii'), nrc:col(h,'crt')};
+    const g=(r,k)=>C[k]>=0?r[C[k]]:'';
+    const veh=[]; for(let i=P.i+1;i<P.rows.length;i++){ const r=P.rows[i]; const n=txt(g(r,'nr')); if(!n || !(txt(g(r,'tip'))||txt(g(r,'marca'))||txt(g(r,'vin')))) continue; veh.push(r); }
+    let sv=null; const S=gasesteTabel(wb,['numar inmatriculare','tip lucrare']);
+    if(S){ const hh=S.h; sv={rows:S.rows, i:S.i, c:{nr:col(hh,'numar inmatriculare'), data:col(hh,'data'), tip:col(hh,'tip lucrare'), desc:col(hh,'descriere'), val:col(hh,'valoare'), doc:col(hh,'factura')}}; if(sv.c.doc<0) sv.c.doc=col(hh,'document'); }
+    const servOk=r=>txt(r[sv.c.nr]) && (txt(r[sv.c.desc])||txt(r[sv.c.tip])) && (valData(r[sv.c.data]) || nr(r[sv.c.val])>0); // rândurile fără dată și fără valoare sunt exemple / necompletate
+    const nServ=sv?sv.rows.slice(sv.i+1).filter(servOk).length:0, nSar=sv?sv.rows.slice(sv.i+1).filter(r=>txt(r[sv.c.nr])&&(txt(r[sv.c.desc])||txt(r[sv.c.tip]))&&!servOk(r)).length:0;
+    confirma(`Am găsit <b>${veh.length} vehicule</b>${sv?` și <b>${nServ} lucrări</b> în istoricul de service`:''}. Le încarc?`, ()=>{
+      let noi=0, act=0, sn=0, creat=[];
+      veh.forEach((r,ix)=>{
+        const n=txt(g(r,'nr')).toUpperCase().replace(/\s+/g,' ');
+        let v=state.vehicule.find(x=>nrCheie(x.nr)===nrCheie(n)); if(!v){ v=vehGol(); state.vehicule.push(v); noi++; } else act++;
+        v.nr=n; v.nrCrt=nr(g(r,'nrc'))||ix+1; v.tip=txt(g(r,'tip')); v.marca=txt(g(r,'marca')); v.vin=txt(g(r,'vin')); v.certInm=txt(g(r,'cert')); v.civ=txt(g(r,'civ'));
+        v.combustibil=txt(g(r,'comb')); v.departament=txt(g(r,'dep')); v.responsabil=txt(g(r,'resp')); const stt=txt(g(r,'status')); if(stt) v.status=STATUSURI.find(s=>norm(s)===norm(stt))||stt;
+        const doc=(k,eCel,nrCel,fCel)=>{ const x=v.docs[k], e=eCel!=null?g(r,eCel):'', nn=nrCel?g(r,nrCel):'', ff=fCel?g(r,fCel):'';
+          if(eNC(e)||eNC(nn)){ x.ap=false; x.expira=''; x.nr=''; x.firma=''; return; }
+          x.ap=true; x.expira=valData(e); x.nr=txt(nn); x.firma=txt(ff); };
+        doc('itp','itp'); doc('rca','rcaE','rcaNr','rcaF'); doc('rov','rov'); doc('acc','accE','accNr','accF');
+        if(C.certNr>=0){ const cn=g(r,'certNr'), ce=g(r,'certE'); if(eNC(cn)&&(eNC(ce)||!txt(ce))){ v.docs.cert.ap=false; } else { v.docs.cert.ap=true; v.docs.cert.nr=txt(cn); v.docs.cert.expira=valData(ce); } }
+        if(C.taho>=0){ const t=g(r,'taho'); if(eNC(t)||!txt(t)) v.docs.taho.ap=false; else { v.docs.taho.ap=true; v.docs.taho.expira=valData(t); } }
+        const km=g(r,'km'); if(typeof km==='number') v.km=km; else { const m=String(km).match(/^\s*([\d.\s]+)/); if(m && nr(m[1].replace(/[.\s]/g,''))) { v.km=nr(m[1].replace(/[.\s]/g,'')); v.kmData=valData(km); } }
+        const rv=g(r,'rev'); if(typeof rv==='number') v.revizieKm=rv; else if(nr(rv)) v.revizieKm=nr(rv);
+        const al=txt(g(r,'alte')); if(al && !v.obs.includes(al)) v.obs=(v.obs?v.obs+'\n':'')+al.replace(/\s{2,}/g,' ');
+      });
+      if(sv){ sv.rows.slice(sv.i+1).forEach(r=>{
+        if(!servOk(r)) return; const n=txt(r[sv.c.nr]), desc=txt(r[sv.c.desc]), tip=txt(r[sv.c.tip]);
+        let v=state.vehicule.find(x=>nrCheie(x.nr)===nrCheie(n));
+        if(!v){ v=vehGol(); v.nr=n.toUpperCase(); v.tip=''; v.obs='Adăugat din istoricul de service — completează datele.'; v.status='Activ'; state.vehicule.push(v); creat.push(v.nr); }
+        const s={vehId:v.id, data:valData(r[sv.c.data]), tip, descriere:desc, valoare:r[sv.c.val]===''?'':nr(r[sv.c.val]), document:txt(r[sv.c.doc])};
+        if(!state.service.some(x=>x.vehId===s.vehId && x.data===s.data && norm(x.descriere)===norm(s.descriere) && nr(x.valoare)===nr(s.valoare))){ state.service.push({id:uid(), ...s}); sn++; }
+      }); }
+      saveNow(); currentTab='termene'; render();
+      const b=openModal(`<h3>Import terminat</h3><p>${noi} vehicule noi, ${act} actualizate${sv?`, ${sn} lucrări de service adăugate`:''}.</p>${nSar?`<p class="small">${nSar} rânduri din istoricul de service n-au nici dată, nici valoare, așa că nu le-am încărcat.</p>`:''}${creat.length?`<p class="small"><b>Atenție:</b> ${creat.map(esc).join(', ')} apare în istoricul de service, dar nu și în lista parcului auto. L-am adăugat ca vehicul — completează-i datele sau șterge-l.</p>`:''}<p class="small muted">Verifică în tabul Termene actele expirate sau fără dată.</p><div class="row" style="justify-content:flex-end;"><button class="btn btn-primary" id="ok-imp">Am înțeles</button></div>`);
+      b.querySelector('#ok-imp').onclick=closeModal;
+    }, 'Da, încarcă');
+  };
+  rd.readAsArrayBuffer(file);
+}
+
+/* ================= EVENIMENTE ================= */
+document.addEventListener('click', e=>{
+  const t=e.target.closest('[data-tab]'); if(t){ goTab(t.dataset.tab); return; }
+  if(e.target.closest('#btn-settings')) return modalSetari();
+  if(e.target.closest('#btn-save-now')){ saveNow()?toast('Salvat ✓'):toast('Nu am putut salva.'); return; }
+  const a=e.target.closest('[data-act]'); if(!a) return;
+  const id=a.dataset.id, v=id?vehById(id):null;
+  switch(a.dataset.act){
+    case 'term-f': ui.termFiltru=a.dataset.v; render(); break;
+    case 'veh-open': ui.vehDetaliu=id; currentTab='vehicule'; render(); document.getElementById('main').scrollTop=0; break;
+    case 'veh-back': ui.vehDetaliu=null; render(); break;
+    case 'veh-nou': modalVehNou(); break;
+    case 'veh-del': confirma(`Ștergi vehiculul <b>${esc(v.nr)}</b> și toate lucrările lui de service?`, ()=>{ state.vehicule=state.vehicule.filter(x=>x.id!==id); state.service=state.service.filter(s=>s.vehId!==id); ui.vehDetaliu=null; save(); render(); }); break;
+    case 'renew': modalRenew(v, a.dataset.k, a.dataset.alt); break;
+    case 'km-upd': modalKm(v); break;
+    case 'alt-add': { const n=document.getElementById('alt-nume').value.trim(); if(!n) return toast('Scrie numele actului.'); v.alte.push({id:uid(), nume:n, expira:document.getElementById('alt-exp').value, ap:true}); save(); render(); break; }
+    case 'alt-del': confirma('Ștergi actul?', ()=>{ v.alte=v.alte.filter(x=>x.id!==a.dataset.a); save(); render(); }); break;
+    case 'serv-add': { const s=citesteService('s'); if(!s.vehId) return toast('Alege vehiculul.'); if(!s.descriere&&!s.tip) return toast('Scrie tipul sau descrierea lucrării.'); ui.servUltimVeh=s.vehId; state.service.push({id:uid(), ...s}); save(); render(); toast('Lucrare adăugată ✓'); break; }
+    case 'serv-nou': modalServNou(id); break;
+    case 'serv-edit': modalServEdit(state.service.find(s=>s.id===a.dataset.s)); break;
+    case 'serv-del': confirma('Ștergi lucrarea?', ()=>{ state.service=state.service.filter(s=>s.id!==a.dataset.s); save(); render(); }); break;
+    case 'raport-tip': ui.raport=a.dataset.v; render(); break;
+    case 'raport-veh': ui.raport='fisa'; ui.raportVeh=id; goTab('rapoarte'); break;
+    case 'pdf': salveazaPDF(); break;
+    case 'print': tipareste(); break;
+    case 'export-json': closeModal(); exportJson(); break;
+    case 'import-json': closeModal(); document.getElementById('file-json').click(); break;
+    case 'import-xls': closeModal(); document.getElementById('file-xls').click(); break;
+    case 'sterge-tot': confirma('Ștergi <b>toate</b> vehiculele și lucrările de pe acest dispozitiv? Fă înainte un backup.', ()=>{ state=stareImplicita(); saveNow(); render(); toast('Date șterse.'); }); break;
+  }
+});
+document.addEventListener('change', e=>{
+  const t=e.target;
+  if(t.id==='file-json'){ if(t.files[0]) importJson(t.files[0]); t.value=''; return; }
+  if(t.id==='file-xls'){ if(t.files[0]) importXls(t.files[0]); t.value=''; return; }
+  if(t.dataset.ui){ ui[t.dataset.ui]=t.value; render(); return; }
+  if(t.dataset.veh){ const v=vehById(t.dataset.id); let val=t.value; if(t.dataset.veh==='nr') val=val.trim().toUpperCase(); v[t.dataset.veh]=val; save(); if(t.tagName!=='TEXTAREA') render(); toast('Salvat ✓',900); return; }
+  if(t.dataset.doc){ const v=vehById(t.dataset.id), x=v.docs[t.dataset.k]; x[t.dataset.doc]=t.dataset.doc==='ap'?t.value==='1':t.value; save(); render(); toast('Salvat ✓',900); return; }
+  if(t.dataset.alt){ const v=vehById(t.dataset.id), x=v.alte.find(q=>q.id===t.dataset.a); x[t.dataset.alt]=t.value; save(); render(); toast('Salvat ✓',900); return; }
+});
+document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeModal(); });
+window.addEventListener('afterprint', ()=>{ document.getElementById('page-style').textContent='@page{size:A4 landscape; margin:10mm;}'; });
+
+/* ================= PORNIRE ================= */
+loadState(); render();
+if('serviceWorker' in navigator && location.protocol.startsWith('http')){
+  window.addEventListener('load', ()=>navigator.serviceWorker.register('service-worker.js').catch(()=>{}));
+}
+</script>
+</body>
+</html>
