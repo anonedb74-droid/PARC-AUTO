@@ -172,12 +172,12 @@ function norm(s){ return String(s??'').normalize('NFD').replace(/[̀-ͯ]/g,'').t
 function nrCheie(s){ return String(s??'').toUpperCase().replace(/[^A-Z0-9]/g,''); }
 
 /* ---------------- stare ---------------- */
-function stareImplicita(){ return { settings:{institutie:'Liceul Tehnologic „Alexandru Vlahuță” Șendriceni', prag:30, pragKm:1000, ultimulExport:''}, vehicule:[], service:[] }; }
-function vehGol(){ const docs={}; DOCS.forEach(d=>docs[d.k]={ap:['itp','rca'].includes(d.k), expira:'', nr:'', firma:''}); return {id:uid(), tip:'Autoturism', marca:'', nr:'', vin:'', certInm:'', civ:'', combustibil:'', departament:'', status:'Activ', responsabil:'', km:'', kmData:'', unitate:'km', revizieKm:'', obs:'', docs, alte:[]}; }
+function stareImplicita(){ return { settings:{institutie:'Liceul Tehnologic „Alexandru Vlahuță” Șendriceni', prag:30, pragKm:1000, ultimulExport:''}, vehicule:[], service:[], alimentari:[], curse:[] }; }
+function vehGol(){ const docs={}; DOCS.forEach(d=>docs[d.k]={ap:['itp','rca'].includes(d.k), expira:'', nr:'', firma:''}); return {id:uid(), tip:'Autoturism', marca:'', nr:'', vin:'', certInm:'', civ:'', combustibil:'', departament:'', status:'Activ', responsabil:'', km:'', kmData:'', unitate:'km', revizieKm:'', obs:'', normaConsum:'', stocInitial:'', stocData:'', docs, alte:[]}; }
 let state=stareImplicita(), ui={}, currentTab='termene', saveTimer=null, ultimaSalvare=null;
 function migreaza(){
   state.settings=Object.assign(stareImplicita().settings, state.settings||{});
-  ['vehicule','service'].forEach(k=>{ if(!Array.isArray(state[k])) state[k]=[]; });
+  ['vehicule','service','alimentari','curse'].forEach(k=>{ if(!Array.isArray(state[k])) state[k]=[]; });
   state.vehicule.forEach(v=>{ const g=vehGol(); Object.keys(g).forEach(k=>{ if(v[k]===undefined) v[k]=g[k]; }); DOCS.forEach(d=>{ if(!v.docs[d.k]) v.docs[d.k]=g.docs[d.k]; }); if(!Array.isArray(v.alte)) v.alte=[]; });
 }
 function loadState(){
@@ -227,9 +227,28 @@ function departamente(){ return [...new Set(state.vehicule.map(v=>v.departament)
 function aniService(){ const s=new Set(state.service.filter(x=>x.data).map(x=>x.data.slice(0,4))); s.add(todayISO().slice(0,4)); return [...s].sort().reverse(); }
 function costVeh(v, an){ return state.service.filter(s=>s.vehId===v.id && (!an || (s.data||'').startsWith(an))).reduce((a,s)=>a+nr(s.valoare),0); }
 
+/* ---------------- consum carburant ---------------- */
+function uMas(v){ return v&&v.unitate==='ore'?'ore':'km'; }
+function parcursCursa(c){ const v=vehById(c.vehId); return uMas(v)==='ore' ? nr(c.ore) : Math.max(0, nr(c.kmStop)-nr(c.kmStart)); }
+function consumCursa(c){ const v=vehById(c.vehId); if(!v) return 0; const n=nr(v.normaConsum); return uMas(v)==='ore' ? parcursCursa(c)*n : parcursCursa(c)*n/100; }
+function etNorma(v){ return uMas(v)==='ore' ? 'l/oră' : 'l/100 km'; }
+function inPer(d,de,pana){ return d && d>=de && d<=pana; }
+function bilant(v, de, pana){
+  const al=state.alimentari.filter(a=>a.vehId===v.id && inPer(a.data,de,pana)), cu=state.curse.filter(c=>c.vehId===v.id && inPer(c.data,de,pana));
+  return {al, cu, litri:al.reduce((x,a)=>x+nr(a.litri),0), valoare:al.reduce((x,a)=>x+nr(a.valoare),0), parcurs:cu.reduce((x,c)=>x+parcursCursa(c),0), consum:cu.reduce((x,c)=>x+consumCursa(c),0)};
+}
+function stocLa(v, iso){ // stocul la începutul zilei iso
+  const de=v.stocData||'0000-01-01'; if(iso<=de) return nr(v.stocInitial);
+  const b=bilant(v, de, plusZileISO(iso,-1)); return nr(v.stocInitial)+b.litri-b.consum;
+}
+function ultimaZi(luna){ const [y,m]=luna.split('-').map(Number); return isoDin(new Date(y, m, 0, 12)); }
+function numeLuna(luna){ const [y,m]=luna.split('-'); return LUNI[+m]+' '+y; }
+
 /* ---------------- icoane / taburi ---------------- */
 const ICONS={
   termene:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M3 9.5h18"/><path d="M8 2.5v4"/><path d="M16 2.5v4"/><path d="M12 13v3"/><circle cx="12" cy="18" r=".6"/></svg>',
+  acte:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3h9l4 4v14H6z"/><path d="M9 11h7"/><path d="M9 15h7"/><path d="M9 7h3"/></svg>',
+  consum:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 21V5a2 2 0 012-2h6a2 2 0 012 2v16"/><path d="M3 21h12"/><path d="M7 8h4"/><path d="M14 10h2a2 2 0 012 2v4a1.5 1.5 0 003 0V8l-3-3"/></svg>',
   vehicule:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 17h14v-4l-2-5H7l-2 5z"/><path d="M5 13h14"/><circle cx="8" cy="17" r="1.8"/><circle cx="16" cy="17" r="1.8"/></svg>',
   service:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a4 4 0 00-5.4 5.2L3 17.8V21h3.2l6.3-6.3a4 4 0 005.2-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/></svg>',
   rapoarte:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V3h12v6"/><rect x="3" y="9" width="18" height="8" rx="1.5"/><path d="M6 14h12v7H6z"/></svg>',
@@ -238,7 +257,7 @@ const ICONS={
   trash:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M6 7l1 13h10l1-13"/></svg>',
   edit:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></svg>',
 };
-const TABS=[{id:'termene',label:'Termene'},{id:'vehicule',label:'Vehicule'},{id:'service',label:'Service'},{id:'rapoarte',label:'Rapoarte'}];
+const TABS=[{id:'termene',label:'Termene'},{id:'acte',label:'Acte'},{id:'consum',label:'Consum'},{id:'vehicule',label:'Vehicule'},{id:'service',label:'Service'},{id:'rapoarte',label:'Rapoarte'}];
 
 /* ================= RANDARE ================= */
 function render(){
@@ -260,7 +279,8 @@ function render(){
 function renderTab(){
   const main=document.getElementById('main');
   if(!state.vehicule.length && currentTab!=='service'){ main.innerHTML=ecranGol(); return; }
-  main.innerHTML=({termene:tabTermene, vehicule:tabVehicule, service:tabService, rapoarte:tabRapoarte}[currentTab]||tabTermene)();
+  main.innerHTML=({termene:tabTermene, acte:tabActe, consum:tabConsum, vehicule:tabVehicule, service:tabService, rapoarte:tabRapoarte}[currentTab]||tabTermene)();
+  if(currentTab==='consum') actualizeazaFormCursa();
 }
 function goTab(id){ currentTab=id; if(id!=='vehicule') ui.vehDetaliu=null; render(); document.getElementById('main').scrollTop=0; }
 function gol(t,txt){ return `<div class="empty"><div class="display">${t}</div><div>${txt||''}</div></div>`; }
@@ -307,6 +327,102 @@ function tabTermene(){
         <td style="text-align:right;">${t.rev?`<button class="btn btn-ok" data-act="km-upd" data-id="${t.v.id}">Actualizează km</button>`:`<button class="btn btn-ok" data-act="renew" data-id="${t.v.id}" data-k="${t.k||''}" data-alt="${t.alt||''}">Reînnoiește</button>`}</td></tr>`).join('')}
     </tbody></table></div>`:gol(f==='urgente'?'Totul e în regulă':'Niciun termen', f==='urgente'?`Niciun act expirat sau care expiră în ${state.settings.prag} de zile.`:'')}
   </div>`;
+}
+
+/* ---------------- ACTE (pe fiecare vehicul) ---------------- */
+function tabActe(){
+  const dep=ui.acteDep||'all';
+  const l=vehOrdonate().filter(v=>(dep==='all'||v.departament===dep));
+  const card=v=>{
+    const rows=[]; const nc=[];
+    DOCS.forEach(d=>{ const x=v.docs[d.k]; if(!x.ap){ nc.push(d.s); return; } rows.push({nume:d.n, nr:[x.nr,x.firma].filter(Boolean).join(' · '), expira:x.expira, st:stare(x.expira), k:d.k}); });
+    v.alte.forEach(a=>rows.push({nume:a.nume, nr:'', expira:a.expira, st:stare(a.expira), alt:a.id}));
+    const rau=rows.reduce((m,r)=>Math.max(m,r.st.niv),0);
+    return `<div class="card ${vehUrmarit(v)?'':'nap'}" style="border-top:4px solid ${rau===3?'var(--danger)':rau===2?'var(--yellow)':'var(--ok)'};">
+      <div class="row" style="justify-content:space-between; align-items:flex-start; margin-bottom:8px;">
+        <div><h3 style="margin:0; font-size:18px;">${esc(v.nr)}</h3><div class="small muted">${esc(v.tip)} · ${esc(v.marca)}${v.departament?' · '+esc(v.departament):''}${v.responsabil?' · '+esc(v.responsabil):''}</div></div>
+        <button class="btn btn-ghost" data-act="veh-open" data-id="${v.id}">Fișa vehiculului</button></div>
+      <div class="table-wrap"><table><tbody>${rows.map(r=>`<tr><td><b>${esc(r.nume)}</b>${r.nr?`<div class="small muted">${esc(r.nr)}</div>`:''}</td><td style="white-space:nowrap;">${fmtData(r.expira)}</td><td><span class="pill ${r.st.cls}">${r.st.txt}</span></td>
+        <td style="text-align:right;"><button class="btn btn-ok" data-act="renew" data-id="${v.id}" data-k="${r.k||''}" data-alt="${r.alt||''}">Reînnoiește</button></td></tr>`).join('')}</tbody></table></div>
+      ${nc.length?`<div class="small muted" style="margin-top:8px;">Nu este cazul: ${nc.join(', ')}</div>`:''}
+    </div>`; };
+  return `<h2>Acte și termene</h2><p class="tab-desc">Fiecare vehicul, cu actele lui. Bara de sus a cardului: roșu = ceva expirat sau fără dată, galben = expiră curând, verde = totul în regulă.</p>
+    ${departamente().length>1?`<div class="row" style="margin-bottom:14px;"><div class="field"><label>Departament</label><select data-ui="acteDep" class="sm"><option value="all">Toate</option>${departamente().map(d=>`<option ${d===dep?'selected':''}>${esc(d)}</option>`).join('')}</select></div></div>`:''}
+    <div class="two-col">${l.map(card).join('')}</div>`;
+}
+
+/* ---------------- CONSUM ---------------- */
+function tabConsum(){
+  const luna=ui.consLuna||todayISO().slice(0,7), de=luna+'-01', pana=ultimaZi(luna);
+  const vid=ui.consVeh||'all';
+  const vehAct=vehOrdonate().filter(vehUrmarit);
+  const sel=vehById(ui.consUltimVeh)||vehAct[0]||vehOrdonate()[0];
+  const lista=vehOrdonate().filter(v=>(vid==='all'||v.id===vid) && (nr(v.normaConsum)>0 || state.alimentari.some(a=>a.vehId===v.id) || state.curse.some(c=>c.vehId===v.id)));
+  const faraNorma=vehAct.filter(v=>!nr(v.normaConsum) && v.combustibil && v.combustibil!=='-');
+  const optVeh=selId=>vehOrdonate().map(v=>`<option value="${v.id}" ${v.id===selId?'selected':''}>${esc(v.nr)} · ${esc(v.marca)}</option>`).join('');
+  const card=v=>{
+    const b=bilant(v,de,pana), s0=stocLa(v,de), s1=s0+b.litri-b.consum, u=uMas(v), acum=stocLa(v, plusZileISO(todayISO(),1));
+    return `<div class="card"><div class="row" style="justify-content:space-between; align-items:flex-start; margin-bottom:12px;">
+        <div><h3 style="margin:0; font-size:20px;">${esc(v.nr)}</h3><div class="small muted">${esc(v.marca)} · ${esc(v.combustibil||'—')} · normă ${nr(v.normaConsum)?fmtNr(nr(v.normaConsum))+' '+etNorma(v):'<b style="color:var(--danger);">necompletată</b>'}</div></div>
+        <button class="btn btn-ghost" data-act="veh-open" data-id="${v.id}">Normă și stoc inițial</button></div>
+      <div class="stats" style="margin-bottom:12px;">
+        <div class="stat"><div class="v">${fmtNr(s0)}</div><div class="l">Stoc la 1 ${LUNI_SC[+luna.slice(5)].toLowerCase()} (l)</div></div>
+        <div class="stat"><div class="v" style="color:var(--ok);">+${fmtNr(b.litri)}</div><div class="l">Alimentat (l) · ${fmtNr(b.valoare)} lei</div></div>
+        <div class="stat"><div class="v">${fmtNr(b.parcurs)}</div><div class="l">${u==='ore'?'Ore funcționare':'Km parcurși'}</div></div>
+        <div class="stat"><div class="v" style="color:var(--accent);">−${fmtNr(b.consum)}</div><div class="l">Consum normat (l)</div></div>
+        <div class="stat ${s1<0?'red':''}"><div class="v">${fmtNr(s1)}</div><div class="l">Stoc la sfârșitul lunii (l)</div></div>
+      </div>
+      ${acum<0?'<div class="alert alert-danger">⚠ Consumul calculat depășește ce s-a alimentat. Verifică alimentările, km sau stocul inițial.</div>':''}
+      <div class="two-col">
+        <div><div class="sec-head" style="margin-top:0;">Alimentări</div>${b.al.length?`<div class="table-wrap"><table><thead><tr><th>Data</th><th class="num">Litri</th><th class="num">Lei</th><th>Document</th><th></th></tr></thead><tbody>
+          ${b.al.sort((x,y)=>x.data.localeCompare(y.data)).map(a=>`<tr><td>${fmtData(a.data)}</td><td class="num">${fmtNr(nr(a.litri))}</td><td class="num">${a.valoare?fmtLei(nr(a.valoare)):'—'}</td><td class="small">${esc(a.document)}</td><td style="text-align:right;"><button class="icon-btn del" data-act="al-del" data-x="${a.id}">${ICONS.trash}</button></td></tr>`).join('')}
+          </tbody></table></div>`:'<p class="small muted">Nicio alimentare în luna aleasă.</p>'}</div>
+        <div><div class="sec-head" style="margin-top:0;">Curse / foi de parcurs</div>${b.cu.length?`<div class="table-wrap"><table><thead><tr><th>Data</th><th>Foaia</th><th class="num">${u==='ore'?'Ore':'Km'}</th><th class="num">Litri</th><th>Traseu / șofer</th><th></th></tr></thead><tbody>
+          ${b.cu.sort((x,y)=>x.data.localeCompare(y.data)).map(c=>`<tr><td>${fmtData(c.data)}</td><td>${esc(c.foaie)}</td><td class="num">${fmtNr(parcursCursa(c))}${u==='km'?`<div class="small muted">${fmtNr(nr(c.kmStart))}→${fmtNr(nr(c.kmStop))}</div>`:''}</td><td class="num">${fmtNr(consumCursa(c))}</td><td class="small">${esc(c.scop)}${c.sofer?`<div class="muted">${esc(c.sofer)}</div>`:''}</td><td style="text-align:right;"><button class="icon-btn del" data-act="cu-del" data-x="${c.id}">${ICONS.trash}</button></td></tr>`).join('')}
+          </tbody></table></div>`:'<p class="small muted">Nicio cursă în luna aleasă.</p>'}</div>
+      </div></div>`; };
+  const sumar=lista.map(v=>{ const b=bilant(v,de,pana); return `<span class="pill pill-dark">${esc(v.nr)}: ${fmtNr(b.litri)} l alimentat · ${fmtNr(b.consum)} l consumat · stoc ${fmtNr(stocLa(v,de)+b.litri-b.consum)} l</span>`; }).join(' ');
+  return `<h2>Consum carburant</h2><p class="tab-desc">Alimentările și cursele (foile de parcurs) fiecărei mașini. Consumul se calculează din km parcurși × norma de consum, iar la tractoare din ore × normă.</p>
+  ${faraNorma.length?`<div class="alert alert-yellow"><div><b>Fără normă de consum:</b> ${faraNorma.map(v=>esc(v.nr)).join(', ')}. Completeaz-o în fișa vehiculului (Vehicule → mașina → Consum carburant).</div></div>`:''}
+  <div class="two-col">
+    <div class="card"><h3>Alimentare</h3><div class="grid2">
+      <div class="field"><label>Vehicul</label><select id="al-veh">${optVeh(sel&&sel.id)}</select></div>
+      <div class="field"><label>Data</label><input type="date" id="al-data" value="${todayISO()}"></div>
+      <div class="field"><label>Litri</label><input type="number" id="al-l" step="0.01" min="0"></div>
+      <div class="field"><label>Valoare (lei)</label><input type="number" id="al-val" step="0.01" min="0"></div></div>
+      <div class="field" style="margin-top:12px;"><label>Bon / factură / card (opțional)</label><input type="text" id="al-doc" placeholder="ex: bon fiscal 1234, card combustibil"></div>
+      <div class="row" style="margin-top:12px;"><button class="btn btn-primary" data-act="al-add">Adaugă alimentarea</button></div></div>
+    <div class="card"><h3>Cursă / foaie de parcurs</h3><div class="grid2">
+      <div class="field"><label>Vehicul</label><select id="cu-veh">${optVeh(sel&&sel.id)}</select></div>
+      <div class="field"><label>Data</label><input type="date" id="cu-data" value="${todayISO()}"></div>
+      <div class="field"><label>Nr. foaie de parcurs</label><input type="text" id="cu-foaie"></div>
+      <div class="field cu-km"><label>Km la plecare</label><input type="number" id="cu-ks" value="${sel&&sel.km!==''?esc(sel.km):''}"></div>
+      <div class="field cu-km"><label>Km la sosire</label><input type="number" id="cu-kf"></div>
+      <div class="field cu-ore" style="display:none;"><label>Ore funcționare</label><input type="number" id="cu-ore" step="0.1" min="0"></div></div>
+      <div class="grid2" style="margin-top:12px;"><div class="field"><label>Traseu / scop</label><input type="text" id="cu-scop" placeholder="ex: Șendriceni – Botoșani, ISJ"></div><div class="field"><label>Șofer</label><input type="text" id="cu-sofer" list="dl-sofer"></div></div>
+      <datalist id="dl-sofer">${[...new Set([...state.vehicule.map(v=>v.responsabil), ...state.curse.map(c=>c.sofer)].filter(Boolean))].map(x=>`<option value="${esc(x)}">`).join('')}</datalist>
+      <div class="row" style="margin-top:12px;"><button class="btn btn-primary" data-act="cu-add">Adaugă cursa</button><span class="small muted" id="cu-calc"></span></div></div>
+  </div>
+  <div class="card"><div class="row" style="justify-content:space-between;">
+    <div class="row"><div class="field"><label>Luna</label><input type="month" data-ui="consLuna" value="${luna}" class="sm"></div>
+    <div class="field"><label>Vehicul</label><select data-ui="consVeh" class="sm"><option value="all">Toate</option>${optVeh(vid)}</select></div></div>
+    <button class="btn btn-secondary" data-act="raport-consum">Situația lunară (PDF)</button></div>
+    ${sumar?`<div style="margin-top:12px; display:flex; flex-wrap:wrap; gap:6px;">${sumar}</div>`:''}</div>
+  ${lista.length?lista.map(card).join(''):gol('Nimic încă','Completează norma de consum în fișa vehiculului și adaugă alimentările și cursele.')}`;
+}
+function actualizeazaFormCursa(){
+  const v=vehById((document.getElementById('cu-veh')||{}).value); if(!v) return;
+  const ore=uMas(v)==='ore';
+  document.querySelectorAll('.cu-km').forEach(e=>e.style.display=ore?'none':'');
+  document.querySelectorAll('.cu-ore').forEach(e=>e.style.display=ore?'':'none');
+  const ks=document.getElementById('cu-ks'); if(ks && !ore) ks.value=v.km!==''&&v.km!=null?v.km:'';
+  calcCursa();
+}
+function calcCursa(){
+  const v=vehById((document.getElementById('cu-veh')||{}).value), el=document.getElementById('cu-calc'); if(!v||!el) return;
+  const c={vehId:v.id, kmStart:document.getElementById('cu-ks').value, kmStop:document.getElementById('cu-kf').value, ore:document.getElementById('cu-ore').value};
+  const p=parcursCursa(c);
+  el.textContent = !nr(v.normaConsum) ? 'Vehiculul nu are normă de consum.' : p>0 ? `${fmtNr(p)} ${uMas(v)} × ${fmtNr(nr(v.normaConsum))} ${etNorma(v)} = ${fmtNr(consumCursa(c))} l` : '';
 }
 
 /* ---------------- VEHICULE ---------------- */
@@ -374,6 +490,12 @@ function fisaVehicul(v){
       </div>
       ${rev?`<p style="margin:12px 0 0;"><span class="pill ${rev.cls}">${rev.txt}</span></p>`:'<p class="small muted" style="margin:12px 0 0;">Completează km la bord și km la care se face revizia, ca să primești alertă.</p>'}
     </div>
+    <div class="card"><h3>Consum carburant</h3>
+      <div class="grid2">
+        ${fld(v,'normaConsum','Normă consum ('+etNorma(v)+')',{type:'number'})}${fld(v,'stocInitial','Stoc în rezervor (l)',{type:'number'})}${fld(v,'stocData','la data de',{type:'date'})}
+      </div>
+      <p class="small muted" style="margin:10px 0 0;">Stocul de pornire: câți litri erau în rezervor la data respectivă (de ex. la 1 ianuarie sau la prima alimentare trecută în aplicație). În rezervor acum: <b>${fmtNr(stocLa(v, plusZileISO(todayISO(),1)))} l</b>.</p>
+    </div>
     <div class="card"><h3>Observații / defecțiuni</h3><textarea data-veh="obs" data-id="${v.id}" placeholder="ex: încuietoare portbagaj defectă">${esc(v.obs)}</textarea></div>
   </div>
   <div class="card"><div class="row" style="justify-content:space-between; margin-bottom:8px;"><h3 style="margin:0;">Istoric service și reparații</h3><button class="btn btn-secondary" data-act="serv-nou" data-id="${v.id}">+ Lucrare</button></div>
@@ -428,18 +550,31 @@ function citesteService(pre){
 /* ---------------- RAPOARTE ---------------- */
 function tabRapoarte(){
   const v=ui.raport||'situatie';
-  const opt=[['situatie','Situația parcului'],['termene','Termene apropiate'],['cheltuieli','Cheltuieli pe an'],['fisa','Fișa unui vehicul']];
+  const opt=[['situatie','Situația parcului'],['termene','Termene apropiate'],['consum','Consum carburant'],['cheltuieli','Cheltuieli pe an'],['fisa','Fișa unui vehicul']];
   let filtre='', corp='';
   if(v==='situatie'){ corp=raportSituatie(); }
   else if(v==='termene'){ const z=ui.raportZile||60; filtre=`<div class="field"><label>Expiră în următoarele</label><select data-ui="raportZile" class="sm">${[30,60,90,180].map(x=>`<option value="${x}" ${x==z?'selected':''}>${x} de zile</option>`).join('')}</select></div>`; corp=raportTermene(z); }
   else if(v==='cheltuieli'){ const an=ui.raportAn||todayISO().slice(0,4); filtre=`<div class="field"><label>Anul</label><select data-ui="raportAn" class="sm">${aniService().map(a=>`<option ${a===an?'selected':''}>${a}</option>`).join('')}</select></div>`; corp=raportCheltuieli(an); }
+  else if(v==='consum'){ const l=ui.consLuna||todayISO().slice(0,7); filtre=`<div class="field"><label>Luna</label><input type="month" data-ui="consLuna" value="${l}" class="sm"></div>`; corp=raportConsum(l); }
   else { const id=ui.raportVeh||(vehOrdonate()[0]||{}).id; filtre=`<div class="field"><label>Vehicul</label><select data-ui="raportVeh" class="sm">${vehOrdonate().map(x=>`<option value="${x.id}" ${x.id===id?'selected':''}>${esc(x.nr)} · ${esc(x.marca)}</option>`).join('')}</select></div>`; corp=raportVehicul(vehById(id)); }
   return `<div class="no-print"><h2>Rapoarte</h2><p class="tab-desc">Situații gata de tipărit sau de salvat ca PDF (de trimis pe e-mail sau WhatsApp).</p>
     <div class="seg" style="margin-bottom:14px;">${opt.map(([k,t])=>`<button data-act="raport-tip" data-v="${k}" class="${v===k?'on':''}">${t}</button>`).join('')}</div>
     <div class="row" style="margin-bottom:14px;">${filtre}<button class="btn btn-primary" data-act="pdf">Salvează PDF</button><button class="btn btn-secondary" data-act="print">Tipărește</button></div></div>
     ${corp}`;
 }
-function orientareRaport(){ const v=ui.raport||'situatie'; return (v==='situatie'||v==='cheltuieli')?'landscape':'portrait'; }
+function orientareRaport(){ const v=ui.raport||'situatie'; return (v==='situatie'||v==='cheltuieli'||v==='consum')?'landscape':'portrait'; }
+function raportConsum(luna){
+  const de=luna+'-01', pana=ultimaZi(luna);
+  const l=vehOrdonate().filter(v=>nr(v.normaConsum)>0 || state.alimentari.some(a=>a.vehId===v.id && inPer(a.data,de,pana)) || state.curse.some(c=>c.vehId===v.id && inPer(c.data,de,pana)));
+  let T={litri:0, valoare:0, consum:0};
+  const rows=l.map((v,i)=>{ const b=bilant(v,de,pana), s0=stocLa(v,de), s1=s0+b.litri-b.consum; T.litri+=b.litri; T.valoare+=b.valoare; T.consum+=b.consum;
+    return `<tr><td class="c">${i+1}</td><td style="white-space:nowrap;"><b>${esc(v.nr)}</b></td><td>${esc(v.marca)}</td><td>${esc(v.combustibil)}</td><td>${esc(v.departament)}</td><td class="r">${nr(v.normaConsum)?fmtNr(nr(v.normaConsum))+' '+etNorma(v):'—'}</td><td class="r">${fmtNr(s0)}</td><td class="r">${fmtNr(b.litri)}</td><td class="r">${b.valoare?fmtLei(b.valoare):'—'}</td><td class="r">${fmtNr(b.parcurs)} ${uMas(v)}</td><td class="c">${b.cu.length}</td><td class="r">${fmtNr(b.consum)}</td><td class="r ${s1<0?'rd':''}">${fmtNr(s1)}</td></tr>`; }).join('');
+  return `<div class="raport" style="max-width:1120px;">${capRaport('Situația consumului de carburant', numeLuna(luna)+' ('+fmtData(de)+' – '+fmtData(pana)+')')}
+    ${l.length?`<table><thead><tr><th>Nr.</th><th>Nr. înmatr.</th><th>Marcă / model</th><th>Combustibil</th><th>Departament</th><th>Normă consum</th><th>Stoc inițial (l)</th><th>Alimentat (l)</th><th>Valoare (lei)</th><th>Parcurs</th><th>Nr. curse</th><th>Consum normat (l)</th><th>Stoc final (l)</th></tr></thead><tbody>${rows}
+    <tr><td colspan="7"><b>TOTAL</b></td><td class="r"><b>${fmtNr(T.litri)}</b></td><td class="r"><b>${fmtLei(T.valoare)}</b></td><td></td><td></td><td class="r"><b>${fmtNr(T.consum)}</b></td><td></td></tr></tbody></table>`:'<p style="text-align:center;">Nicio mașină cu normă de consum sau cu alimentări în luna aleasă.</p>'}
+    <div class="r-leg">Consum normat = km parcurși × normă / 100 (la utilaje: ore funcționare × normă). Stoc final = stoc inițial + alimentat − consum normat.</div>
+    <div class="r-sem"><span>Întocmit,</span><span>Administrator,</span><span>Director,</span></div></div>`;
+}
 function capRaport(titlu, sub){ return `<div class="r-inst">${esc(state.settings.institutie)}</div><div class="r-tt">${titlu}</div><div class="r-sub">${sub||''}</div>`; }
 function celTermen(v,k){
   const x=v.docs[k]; if(!x||!x.ap) return '<td class="c">n.c.</td>';
@@ -512,7 +647,7 @@ async function salveazaPDF(){
   const box=document.createElement('div'); box.style.cssText=`width:${w}mm; background:#fff;`;
   const c=r.cloneNode(true); c.style.cssText=`border:none; padding:0; margin:0; max-width:none; width:${w}mm;`; box.appendChild(c);
   const v=ui.raport||'situatie';
-  const nume=({situatie:'Situatia-parcului-auto-'+todayISO(), termene:'Termene-parc-auto-'+todayISO(), cheltuieli:'Cheltuieli-parc-auto-'+(ui.raportAn||todayISO().slice(0,4)), fisa:'Fisa-vehicul-'+nrCheie((vehById(ui.raportVeh)||vehOrdonate()[0]||{}).nr)}[v])+'.pdf';
+  const nume=({situatie:'Situatia-parcului-auto-'+todayISO(), termene:'Termene-parc-auto-'+todayISO(), cheltuieli:'Cheltuieli-parc-auto-'+(ui.raportAn||todayISO().slice(0,4)), consum:'Consum-carburant-'+(ui.consLuna||todayISO().slice(0,7)), fisa:'Fisa-vehicul-'+nrCheie((vehById(ui.raportVeh)||vehOrdonate()[0]||{}).nr)}[v])+'.pdf';
   toast('Se creează PDF-ul…',1500);
   try{
     const blob=await html2pdf().set({margin:10, filename:nume, image:{type:'jpeg',quality:0.96}, html2canvas:{scale:2, backgroundColor:'#ffffff'},
@@ -613,7 +748,7 @@ async function exportJson(){
 function importJson(file){
   const rd=new FileReader();
   rd.onload=()=>{ try{ const p=JSON.parse(rd.result); if(!p||!Array.isArray(p.vehicule)) throw 0;
-      confirma(`Backup-ul are ${p.vehicule.length} vehicule și ${(p.service||[]).length} lucrări. Tot ce e acum pe acest dispozitiv va fi înlocuit.`, ()=>{ state=Object.assign(stareImplicita(), p); migreaza(); saveNow(); render(); toast('Backup importat ✓'); }, 'Da, importă');
+      confirma(`Backup-ul are ${p.vehicule.length} vehicule, ${(p.service||[]).length} lucrări și ${(p.alimentari||[]).length} alimentări. Tot ce e acum pe acest dispozitiv va fi înlocuit.`, ()=>{ state=Object.assign(stareImplicita(), p); migreaza(); saveNow(); render(); toast('Backup importat ✓'); }, 'Da, importă');
     }catch(e){ toast('Fișierul nu este un backup valid.'); } };
   rd.readAsText(file);
 }
@@ -694,7 +829,7 @@ document.addEventListener('click', e=>{
     case 'veh-open': ui.vehDetaliu=id; currentTab='vehicule'; render(); document.getElementById('main').scrollTop=0; break;
     case 'veh-back': ui.vehDetaliu=null; render(); break;
     case 'veh-nou': modalVehNou(); break;
-    case 'veh-del': confirma(`Ștergi vehiculul <b>${esc(v.nr)}</b> și toate lucrările lui de service?`, ()=>{ state.vehicule=state.vehicule.filter(x=>x.id!==id); state.service=state.service.filter(s=>s.vehId!==id); ui.vehDetaliu=null; save(); render(); }); break;
+    case 'veh-del': confirma(`Ștergi vehiculul <b>${esc(v.nr)}</b> cu tot istoricul lui (service, alimentări, curse)?`, ()=>{ state.vehicule=state.vehicule.filter(x=>x.id!==id); state.service=state.service.filter(s=>s.vehId!==id); state.alimentari=state.alimentari.filter(x=>x.vehId!==id); state.curse=state.curse.filter(x=>x.vehId!==id); ui.vehDetaliu=null; save(); render(); }); break;
     case 'renew': modalRenew(v, a.dataset.k, a.dataset.alt); break;
     case 'km-upd': modalKm(v); break;
     case 'alt-add': { const n=document.getElementById('alt-nume').value.trim(); if(!n) return toast('Scrie numele actului.'); v.alte.push({id:uid(), nume:n, expira:document.getElementById('alt-exp').value, ap:true}); save(); render(); break; }
@@ -704,6 +839,19 @@ document.addEventListener('click', e=>{
     case 'serv-edit': modalServEdit(state.service.find(s=>s.id===a.dataset.s)); break;
     case 'serv-del': confirma('Ștergi lucrarea?', ()=>{ state.service=state.service.filter(s=>s.id!==a.dataset.s); save(); render(); }); break;
     case 'raport-tip': ui.raport=a.dataset.v; render(); break;
+    case 'raport-consum': ui.raport='consum'; goTab('rapoarte'); break;
+    case 'al-add': { const vv=vehById(document.getElementById('al-veh').value), l=nr(document.getElementById('al-l').value), d=document.getElementById('al-data').value;
+      if(!vv||!d) return toast('Alege vehiculul și data.'); if(!(l>0)) return toast('Scrie câți litri.');
+      state.alimentari.push({id:uid(), vehId:vv.id, data:d, litri:l, valoare:document.getElementById('al-val').value, document:document.getElementById('al-doc').value.trim()});
+      ui.consUltimVeh=vv.id; save(); render(); toast(`Alimentare ${vv.nr}: ${fmtNr(l)} l ✓`); break; }
+    case 'cu-add': { const vv=vehById(document.getElementById('cu-veh').value), d=document.getElementById('cu-data').value; if(!vv||!d) return toast('Alege vehiculul și data.');
+      const c={id:uid(), vehId:vv.id, data:d, foaie:document.getElementById('cu-foaie').value.trim(), kmStart:document.getElementById('cu-ks').value, kmStop:document.getElementById('cu-kf').value, ore:document.getElementById('cu-ore').value, scop:document.getElementById('cu-scop').value.trim(), sofer:document.getElementById('cu-sofer').value.trim()};
+      if(uMas(vv)==='ore'){ if(!(nr(c.ore)>0)) return toast('Scrie orele de funcționare.'); c.kmStart=''; c.kmStop=''; }
+      else { if(c.kmStop==='' || c.kmStart==='') return toast('Scrie km la plecare și la sosire.'); if(nr(c.kmStop)<nr(c.kmStart)) return toast('Km la sosire trebuie să fie mai mari decât la plecare.'); c.ore='';
+        if(vv.km==='' || nr(c.kmStop)>=nr(vv.km)){ vv.km=nr(c.kmStop); vv.kmData=d; } }
+      state.curse.push(c); ui.consUltimVeh=vv.id; save(); render(); toast(`Cursă ${vv.nr}: ${fmtNr(parcursCursa(c))} ${uMas(vv)}, ${fmtNr(consumCursa(c))} l ✓`, 2600); break; }
+    case 'al-del': confirma('Ștergi alimentarea?', ()=>{ state.alimentari=state.alimentari.filter(x=>x.id!==a.dataset.x); save(); render(); }); break;
+    case 'cu-del': confirma('Ștergi cursa?', ()=>{ state.curse=state.curse.filter(x=>x.id!==a.dataset.x); save(); render(); }); break;
     case 'raport-veh': ui.raport='fisa'; ui.raportVeh=id; goTab('rapoarte'); break;
     case 'pdf': salveazaPDF(); break;
     case 'print': tipareste(); break;
@@ -717,12 +865,14 @@ document.addEventListener('change', e=>{
   const t=e.target;
   if(t.id==='file-json'){ if(t.files[0]) importJson(t.files[0]); t.value=''; return; }
   if(t.id==='file-xls'){ if(t.files[0]) importXls(t.files[0]); t.value=''; return; }
+  if(t.id==='cu-veh'){ actualizeazaFormCursa(); return; }
   if(t.dataset.ui){ ui[t.dataset.ui]=t.value; render(); return; }
   if(t.dataset.veh){ const v=vehById(t.dataset.id); let val=t.value; if(t.dataset.veh==='nr') val=val.trim().toUpperCase(); v[t.dataset.veh]=val; save(); if(t.tagName!=='TEXTAREA') render(); toast('Salvat ✓',900); return; }
   if(t.dataset.doc){ const v=vehById(t.dataset.id), x=v.docs[t.dataset.k]; x[t.dataset.doc]=t.dataset.doc==='ap'?t.value==='1':t.value; save(); render(); toast('Salvat ✓',900); return; }
   if(t.dataset.alt){ const v=vehById(t.dataset.id), x=v.alte.find(q=>q.id===t.dataset.a); x[t.dataset.alt]=t.value; save(); render(); toast('Salvat ✓',900); return; }
 });
 document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeModal(); });
+document.addEventListener('input', e=>{ if(['cu-ks','cu-kf','cu-ore'].includes(e.target.id)) calcCursa(); });
 window.addEventListener('afterprint', ()=>{ document.getElementById('page-style').textContent='@page{size:A4 landscape; margin:10mm;}'; });
 
 /* ================= PORNIRE ================= */
