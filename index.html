@@ -280,6 +280,7 @@ const TABS=[{id:'termene',label:'Termene'},{id:'acte',label:'Acte'},{id:'consum'
 
 /* ================= RANDARE ================= */
 function render(){
+  const _m=document.getElementById('main'), _y=_m?_m.scrollTop:0, _t=currentTab; // păstrăm poziția în pagină
   const urg=termene().filter(t=>t.st.niv>=2).length;
   const nav=TABS.map(t=>`<button data-tab="${t.id}" class="${currentTab===t.id?'active':''}">${ICONS[t.id]}<span>${t.label}</span>${t.id==='termene'&&urg?`<span class="badge">${urg}</span>`:''}</button>`).join('');
   document.getElementById('app').innerHTML=`
@@ -294,6 +295,7 @@ function render(){
     <div class="body-wrap"><nav class="sidebar">${nav}</nav><main id="main"></main></div>
     <nav class="bottombar">${nav}</nav>`;
   indicator(); renderTab(); saveUI();
+  const _n=document.getElementById('main'); if(_n && _t===currentTab) _n.scrollTop=_y;
 }
 function renderTab(){
   const main=document.getElementById('main');
@@ -377,7 +379,7 @@ function tabConsum(){
   const vid=ui.consVeh||'all';
   const vehAct=vehOrdonate().filter(vehUrmarit);
   const sel=vehById(ui.consUltimVeh)||vehAct[0]||vehOrdonate()[0];
-  const lista=vehOrdonate().filter(v=>(vid==='all'||v.id===vid) && (areNorma(v) || state.alimentari.some(a=>a.vehId===v.id) || state.curse.some(c=>c.vehId===v.id)));
+  const lista=vid!=='all' ? vehOrdonate().filter(v=>v.id===vid) : vehOrdonate().filter(v=>(vehUrmarit(v) && v.combustibil && v.combustibil!=='-') || areNorma(v) || state.alimentari.some(a=>a.vehId===v.id) || state.curse.some(c=>c.vehId===v.id));
   const faraNorma=vehAct.filter(v=>!areNorma(v) && v.combustibil && v.combustibil!=='-');
   const optVeh=selId=>vehOrdonate().map(v=>`<option value="${v.id}" ${v.id===selId?'selected':''}>${esc(v.nr)} · ${esc(v.marca)}</option>`).join('');
   const fel=ui.cuFel||'cursa';
@@ -449,7 +451,13 @@ function tabConsum(){
     <div class="field"><label>Vehicul</label><select data-ui="consVeh" class="sm"><option value="all">Toate</option>${optVeh(vid)}</select></div></div>
     <button class="btn btn-secondary" data-act="raport-consum">Situația lunară (PDF)</button></div>
     ${sumar?`<div style="margin-top:12px; display:flex; flex-wrap:wrap; gap:6px;">${sumar}</div>`:''}</div>
-  ${lista.length?lista.map(card).join(''):gol('Nimic încă','Completează normele de consum în fișa vehiculului și adaugă alimentările, cursele și orele.')}`;
+  ${lista.length?lista.map(card).join(''):gol('Nimic încă','Completează normele de consum în fișa vehiculului și adaugă alimentările, cursele și orele.')}
+  ${lista.length?`<div class="card" style="border-top:4px solid var(--accent);"><h3>Alimentări în ${numeLuna(luna).toLowerCase()} și rămas din luna trecută</h3>
+    <div class="table-wrap"><table><thead><tr><th>Mașina</th><th class="num">Rămas luna trecută (l)</th><th>Alimentări în lună</th><th class="num">Alimentat (l)</th><th class="num">Lei</th><th class="num">Total disponibil (l)</th><th class="num">Consum (l)</th><th class="num">Rămâne (l)</th></tr></thead><tbody>
+    ${(()=>{ let t0=0,tl=0,tv=0,tc=0; const r=lista.map(v=>{ const b=bilant(v,de,pana), s0=stocLa(v,de), s1=s0+b.litri-b.consum; t0+=s0; tl+=b.litri; tv+=b.valoare; tc+=b.consum;
+        return `<tr><td><b>${esc(v.nr)}</b></td><td class="num">${fmtNr(s0)}</td><td class="small">${b.al.slice().sort((x,y)=>x.data.localeCompare(y.data)).map(a=>`${fmtData(a.data)}: <b>${fmtNr(nr(a.litri))} l</b>`).join('<br>')||'<span class="muted">—</span>'}</td><td class="num">${fmtNr(b.litri)}</td><td class="num">${b.valoare?fmtLei(b.valoare):'—'}</td><td class="num"><b>${fmtNr(s0+b.litri)}</b></td><td class="num">${fmtNr(b.consum)}</td><td class="num" style="${s1<0?'color:var(--danger);':''}"><b>${fmtNr(s1)}</b></td></tr>`; }).join('');
+      return r+`<tr class="total"><td>TOTAL</td><td class="num">${fmtNr(t0)}</td><td></td><td class="num">${fmtNr(tl)}</td><td class="num">${fmtLei(tv)}</td><td class="num">${fmtNr(t0+tl)}</td><td class="num">${fmtNr(tc)}</td><td class="num">${fmtNr(t0+tl-tc)}</td></tr>`; })()}
+    </tbody></table></div><p class="small muted" style="margin:8px 0 0;">Total disponibil = rămas din luna trecută + alimentat în lună. Rămâne = total disponibil − consum; trece automat ca „rămas” în luna următoare.</p></div>`:''}`;
 }
 function actualizeazaFormCursa(){
   const v=vehById((document.getElementById('cu-veh')||{}).value); if(!v) return;
