@@ -278,6 +278,16 @@ const ICONS={
 };
 const TABS=[{id:'termene',label:'Termene'},{id:'acte',label:'Acte'},{id:'consum',label:'Consum'},{id:'vehicule',label:'Vehicule'},{id:'service',label:'Service'},{id:'rapoarte',label:'Rapoarte'}];
 
+/* ---------------- instalare ca aplicație ---------------- */
+let promptInstalare=null;
+window.addEventListener('beforeinstallprompt', e=>{ e.preventDefault(); promptInstalare=e; render(); });
+window.addEventListener('appinstalled', ()=>{ promptInstalare=null; toast('Aplicația a fost instalată ✓', 3000); render(); });
+function eAplicatie(){ return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone===true; }
+async function instaleaza(){
+  if(promptInstalare){ promptInstalare.prompt(); const r=await promptInstalare.userChoice; promptInstalare=null; render(); if(r && r.outcome!=='accepted') toast('Instalarea a fost anulată.'); return; }
+  openModal(`<h3>Instalează aplicația</h3><p>Pe laptop, în <b>Chrome</b>: apasă iconița de instalare din dreapta barei de adresă (un monitor cu săgeată), sau meniul <b>⋮</b> → <b>Transmite, salvează și trimite</b> → <b>Instalează pagina ca aplicație</b>.</p><p>În <b>Microsoft Edge</b>: meniul <b>…</b> → <b>Aplicații</b> → <b>Instalează acest site ca aplicație</b>.</p><p class="small muted">După instalare, „Parc auto” apare în meniul Start și pe bara de activități și se deschide într-o fereastră proprie, fără Chrome.</p><div class="row" style="justify-content:flex-end;"><button class="btn btn-primary" id="inst-ok">Am înțeles</button></div>`).querySelector('#inst-ok').onclick=closeModal;
+}
+
 /* ================= RANDARE ================= */
 function render(){
   const _m=document.getElementById('main'), _y=_m?_m.scrollTop:0, _t=currentTab; // păstrăm poziția în pagină
@@ -288,6 +298,7 @@ function render(){
       <div class="title"><h1>Parc auto</h1><span class="subtitle">${esc(state.settings.institutie)}</span></div>
       <div style="display:flex; align-items:center; gap:10px;">
         <span class="date" id="save-indicator"></span>
+        ${eAplicatie()?'':`<button class="btn btn-secondary" data-act="instaleaza" style="padding:7px 12px; min-height:36px; background:transparent; color:#fff; border-color:#5A6B7A;">⬇ Instalează</button>`}
         <button class="btn btn-primary" id="btn-save-now" style="padding:8px 14px; min-height:36px; display:flex; align-items:center; gap:6px;">${ICONS.save}<span>Salvează</span></button>
         <button class="settings-btn" id="btn-settings" title="Setări">${ICONS.gear}</button>
       </div>
@@ -973,6 +984,7 @@ document.addEventListener('click', e=>{
     case 'cu-del': confirma('Ștergi cursa?', ()=>{ state.curse=state.curse.filter(x=>x.id!==a.dataset.x); save(); render(); }); break;
     case 'raport-veh': ui.raport='fisa'; ui.raportVeh=id; goTab('rapoarte'); break;
     case 'pdf': salveazaPDF(); break;
+    case 'instaleaza': instaleaza(); break;
     case 'print': tipareste(); break;
     case 'export-json': closeModal(); exportJson(); break;
     case 'import-json': closeModal(); document.getElementById('file-json').click(); break;
