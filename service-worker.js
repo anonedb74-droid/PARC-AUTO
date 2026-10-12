@@ -1,12 +1,13 @@
 // Service worker pentru Parc auto — face aplicația disponibilă offline,
 // oricât timp a trecut de la ultima deschidere cu internet.
-const CACHE_NAME = 'parc-auto-cache-v2';
+const CACHE_NAME = 'parc-auto-cache-v3';
 const FILES_DE_CACHE = [
   './',
   './index.html',
   './manifest.json',
   './icon-192.png',
   './icon-512.png',
+  './xlsx.full.min.js',
 ];
 
 self.addEventListener('install', (event) => {

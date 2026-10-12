@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" defer></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
+<script src="xlsx.full.min.js" defer></script>
 <style id="page-style">@page{size:A4 landscape; margin:10mm;}</style>
 <style>
   :root{
@@ -327,7 +327,7 @@ function ecranGol(){
 function bannerBackup(){
   const z=state.settings.ultimulExport?zileIntre(state.settings.ultimulExport, todayISO()):null;
   if(z!==null && z<14) return '';
-  return `<div class="alert alert-blue"><div>💾 ${z===null?'<b>N-ai făcut încă niciun backup.</b> Datele stau doar pe acest dispozitiv.':`<b>Ultimul backup a fost acum ${z} zile.</b>`}</div><button class="btn btn-primary" data-act="export-json">Exportă backup</button></div>`;
+  return `<div class="alert alert-blue"><div>💾 ${z===null?'<b>N-ai făcut încă niciun backup.</b> Datele stau doar pe acest dispozitiv.':`<b>Ultimul backup a fost acum ${z} zile.</b>`}</div><div class="row" style="gap:6px;"><button class="btn btn-primary" data-act="export-json">Exportă backup</button><button class="btn btn-secondary" data-act="export-xlsx">Exportă Excel</button></div></div>`;
 }
 
 /* ---------------- TERMENE ---------------- */
@@ -857,6 +857,9 @@ function modalSetari(){
     <hr><h3 style="font-size:14px;">Backup</h3>
     <p class="small muted">Datele stau doar pe acest dispozitiv. Exportă un backup din când în când (îl poți trimite pe e-mail sau ține pe stick) și îl poți importa pe alt calculator sau telefon.</p>
     <div class="row"><button class="btn btn-secondary" data-act="export-json">Exportă backup</button><button class="btn btn-ghost" data-act="import-json">Importă backup</button></div>
+    <h3 style="font-size:14px; margin-top:12px;">Export Excel (pentru citit și justificare)</h3>
+    <p class="small muted">Un fișier Excel nou, cu toate datele până azi: vehicule, acte, service, alimentări, curse și ore, consum lunar. Pentru readucerea datelor în aplicație folosește backup-ul de mai sus.</p>
+    <div class="row"><button class="btn btn-secondary" data-act="export-xlsx">Exportă Excel</button></div>
     <hr><h3 style="font-size:14px;">Excel</h3>
     <p class="small muted">Încarcă fișierul „Baza de date parc auto” (.xls / .xlsx). Vehiculele existente cu același număr se actualizează, cele noi se adaugă; istoricul de service se completează fără dubluri.</p>
     <div class="row"><button class="btn btn-secondary" data-act="import-xls">Încarcă din Excel</button></div>
@@ -868,6 +871,36 @@ function modalSetari(){
 async function exportJson(){
   const r=await partajeazaSauDescarca(new Blob([JSON.stringify(state,null,1)],{type:'application/json'}), `parc-auto-backup-${todayISO()}.json`, 'Backup parc auto');
   if(r!=='cancel'){ state.settings.ultimulExport=todayISO(); save(); render(); toast('Backup exportat ✓'); }
+}
+/* ---- Export în Excel (pentru citit) ---- */
+async function exportXlsx(){
+  if(typeof XLSX==='undefined') return toast('Biblioteca Excel nu s-a încărcat. Deschide aplicația o dată cu internet și încearcă din nou.', 4000);
+  const wb=XLSX.utils.book_new();
+  const D=iso=>{ if(!iso) return ''; const [y,m,d]=iso.split('-').map(Number); if(!y||!m||!d) return iso; return {t:'n', v:(Date.UTC(y,m-1,d)-Date.UTC(1899,11,30))/86400000, z:'dd/mm/yyyy'}; };
+  const R=x=>Math.round(x*100)/100;
+  const add=(name, aoa, cols)=>{ const ws=XLSX.utils.aoa_to_sheet(aoa); if(cols) ws['!cols']=cols.map(w=>({wch:w})); XLSX.utils.book_append_sheet(wb, ws, name); };
+  const nrV=id=>{ const v=vehById(id); return v?v.nr:''; };
+  const veh=vehOrdonate();
+  add('Vehicule', [['NR. ÎNMATRICULARE','TIP','MARCA','VIN','COMBUSTIBIL','DEPARTAMENT','STATUS','RESPONSABIL','KM / ORE LA BORD','DATA CITIRII','REVIZIE LA','NORME CONSUM','STOC INIȚIAL (l)','DATA STOC','OBSERVAȚII'],
+    ...veh.map(v=>[v.nr, v.tip, v.marca, v.vin, v.combustibil, v.departament, v.status, v.responsabil, v.km===''?'':nr(v.km), D(v.kmData), v.revizieKm===''?'':nr(v.revizieKm), textNorme(v), v.stocInitial===''?'':nr(v.stocInitial), D(v.stocData), v.obs||''])],
+    [14,12,16,20,12,14,11,18,14,12,11,30,12,12,30]);
+  const acte=[['VEHICUL','DOCUMENT','EXPIRĂ','NUMĂR','FIRMĂ','STARE']];
+  veh.forEach(v=>{ DOCS.forEach(d=>{ const x=v.docs[d.k]; if(x&&x.ap) acte.push([v.nr, d.n, D(x.expira), x.nr||'', x.firma||'', stare(x.expira).txt]); }); v.alte.forEach(a=>{ if(a.ap!==false) acte.push([v.nr, a.nume, D(a.expira), '', '', stare(a.expira).txt]); }); });
+  add('Acte', acte, [14,36,12,20,20,20]);
+  const srv=[...state.service].sort((a,b)=>(a.data||'').localeCompare(b.data||''));
+  add('Service', [['DATA','VEHICUL','TIP','DESCRIERE','VALOARE (lei)','DOCUMENT'], ...srv.map(x=>[D(x.data), nrV(x.vehId), x.tip||'', x.descriere||'', x.valoare===''?'':nr(x.valoare), x.document||''])], [12,14,16,40,12,20]);
+  const al=[...state.alimentari].sort((a,b)=>(a.data||'').localeCompare(b.data||''));
+  add('Alimentari', [['DATA','VEHICUL','LITRI','VALOARE (lei)','DOCUMENT'], ...al.map(a=>[D(a.data), nrV(a.vehId), nr(a.litri), a.valoare===''?'':nr(a.valoare), a.document||''])], [12,14,10,12,20]);
+  const cu=[...state.curse].sort((a,b)=>((a.data||'')+(a.ora||'')).localeCompare((b.data||'')+(b.ora||'')));
+  add('Curse si ore', [['DATA','ORA','VEHICUL','FEL','NR. ORE','KM START','KM STOP','PARCURS','CONSUM NORMAT (l)','ȘOFER / INSTRUCTOR','SCOP','FOAIE DE PARCURS'],
+    ...cu.map(c=>[D(c.data), c.ora||'', nrV(c.vehId), eOra(c)?('Oră '+(c.regim||'SS')):'Cursă', eOra(c)?nr(c.nrOre):'', c.kmStart===''||c.kmStart==null?'':nr(c.kmStart), c.kmStop===''||c.kmStop==null?'':nr(c.kmStop), R(parcursCursa(c)), R(consumCursa(c)), c.sofer||'', c.scop||'', c.foaie||''])],
+    [12,7,14,10,8,10,10,10,14,22,28,14]);
+  const luni=[...new Set([...state.alimentari, ...state.curse].map(x=>(x.data||'').slice(0,7)).filter(Boolean))].sort();
+  const cons=[['VEHICUL','LUNA','LITRI ALIMENTAȚI','VALOARE (lei)','ORE SS','ORE IP','PARCURS','CONSUM NORMAT (l)','STOC SFÂRȘIT LUNĂ (l)']];
+  veh.forEach(v=>luni.forEach(l=>{ const de=l+'-01', pana=ultimaZi(l); const b=bilant(v,de,pana); if(!b.al.length && !b.cu.length) return; cons.push([v.nr, numeLuna(l), R(b.litri), R(b.valoare), b.oreSS, b.oreIP, R(b.parcurs), R(b.consum), R(stocLa(v, plusZileISO(pana,1)))]); }));
+  add('Consum lunar', cons, [14,16,14,12,8,8,10,16,18]);
+  const r=await partajeazaSauDescarca(new Blob([XLSX.write(wb,{bookType:'xlsx', type:'array'})],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}), `PARC_AUTO_${todayISO()}.xlsx`, 'Parc auto');
+  if(r!=='cancel') toast('Excel exportat ✓');
 }
 function importJson(file){
   const rd=new FileReader();
@@ -987,6 +1020,7 @@ document.addEventListener('click', e=>{
     case 'instaleaza': instaleaza(); break;
     case 'print': tipareste(); break;
     case 'export-json': closeModal(); exportJson(); break;
+    case 'export-xlsx': closeModal(); exportXlsx(); break;
     case 'import-json': closeModal(); document.getElementById('file-json').click(); break;
     case 'import-xls': closeModal(); document.getElementById('file-xls').click(); break;
     case 'sterge-tot': confirma('Ștergi <b>toate</b> vehiculele și lucrările de pe acest dispozitiv? Fă înainte un backup.', ()=>{ state=stareImplicita(); saveNow(); render(); toast('Date șterse.'); }); break;
