@@ -1,6 +1,6 @@
 // Service worker pentru Parc auto — face aplicația disponibilă offline,
 // oricât timp a trecut de la ultima deschidere cu internet.
-const CACHE_NAME = 'parc-auto-cache-v3';
+const CACHE_NAME = 'parc-auto-cache-v4';
 const FILES_DE_CACHE = [
   './',
   './index.html',

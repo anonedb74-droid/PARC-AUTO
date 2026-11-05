@@ -510,7 +510,7 @@ function importOre(file){
       ${Object.keys(necunoscute).length?`<p class="small" style="color:var(--danger);"><b>Mașini care nu sunt în parc:</b> ${Object.entries(necunoscute).map(([k,n])=>`${esc(k)} (${n} ore)`).join(', ')} — nu se încarcă. Verifică numărul de înmatriculare.</p>`:''}
       ${fara?`<p class="small" style="color:var(--danger);">${fara} ore nu au mașina aleasă în aplicația instructorului — nu se încarcă.</p>`:''}
       ${vechi?`<p class="small"><b>Atenție:</b> există deja ${vechi} ore de la ${esc(instr)} în ${luna?numeLuna(luna).toLowerCase():'această lună'}. Vor fi înlocuite cu cele din fișier.</p>`:''}
-      <p class="small muted">Km la plecare/sosire se calculează pe fiecare mașină, în ordinea orelor, pornind de la ultimul km cunoscut în aplicație.</p>
+      <p class="small muted">Km la plecare/sosire se iau de la bord, așa cum i-a trecut instructorul. La orele fără km de bord se calculează în ordinea orelor, pornind de la ultimul km cunoscut în aplicație.</p>
       <div class="row" style="justify-content:flex-end;"><button class="btn btn-ghost" id="io-x">Renunță</button><button class="btn btn-primary" id="io-ok" ${randuri?'':'disabled'}>Încarcă orele</button></div>`);
     b.querySelector('#io-x').onclick=closeModal;
     b.querySelector('#io-ok').onclick=()=>{
@@ -518,8 +518,9 @@ function importOre(file){
       let n=0;
       Object.entries(pe).forEach(([id,l])=>{ const v=vehById(id);
         l.sort((a,b)=>(a.data+(a.ora||'')).localeCompare(b.data+(b.ora||''))).forEach(o=>{
-          const st=ultimKm(id, o.data, o.ora||'00:00'), km=nr(o.km);
-          const c={id:uid(), vehId:id, data:o.data, ora:o.ora||'', fel:'ora', regim:o.regim==='IP'?'IP':'SS', nrOre:nr(o.nrOre), km, kmStart:st===''?'':st, kmStop:st===''?'':st+km, sofer:instr, scop:'', foaie:'', sursa:'scoala-soferi', sursaId:o.id};
+          const areBord=o.kmPlecare!==undefined && o.kmPlecare!=='' && o.kmSosire!==undefined && o.kmSosire!=='';
+          const st=areBord?nr(o.kmPlecare):ultimKm(id, o.data, o.ora||'00:00'), km=areBord?Math.max(0,nr(o.kmSosire)-nr(o.kmPlecare)):nr(o.km);
+          const c={id:uid(), vehId:id, data:o.data, ora:o.ora||'', fel:'ora', regim:o.regim==='IP'?'IP':'SS', nrOre:nr(o.nrOre), km, kmStart:st===''?'':st, kmStop:areBord?nr(o.kmSosire):(st===''?'':st+km), sofer:instr, scop:'', foaie:'', sursa:'scoala-soferi', sursaId:o.id};
           state.curse.push(c); n++;
           if(c.kmStop!=='' && (v.km===''||v.km==null||nr(c.kmStop)>=nr(v.km))){ v.km=c.kmStop; v.kmData=c.data; }
         }); });
